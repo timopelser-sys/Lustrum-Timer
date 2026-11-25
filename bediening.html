@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Lustrum Bediening</title>
+<style>
+:root{--zwart:#000;--kaart:#0d0a12;--rand:#241a33;--paars:#6a1fc2;--paars-licht:#a774ef;--tekst:#eee;--zacht:#8b80a0;--groen:#3ecf6a;--rood:#e5484d}
+*{box-sizing:border-box}
+html{background:var(--zwart)}
+body{margin:0 auto;max-width:560px;background:var(--zwart);color:var(--tekst);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left))}
+h1{font-size:18px;margin:0;color:var(--paars-licht);letter-spacing:.04em}
+.kop{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.status{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--zacht)}
+.punt{width:9px;height:9px;border-radius:50%;background:#555}
+.punt.ok{background:var(--groen)}.punt.fout{background:var(--rood)}
+.kaart{background:var(--kaart);border:1px solid var(--rand);border-radius:14px;padding:14px;margin-bottom:12px}
+.kaart h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--zacht);margin:0 0 10px;font-weight:600}
+.aftel{font-size:44px;font-weight:800;color:var(--paars-licht);font-variant-numeric:tabular-nums;line-height:1}
+.klein{font-size:13px;color:var(--zacht);margin-top:6px}
+.rij{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:13px 12px;cursor:pointer;background:var(--paars);color:#fff;flex:1;min-width:0}
+button.rand{background:transparent;border:1px solid var(--rand);color:var(--tekst)}
+button:active{transform:scale(.98)}
+button:focus-visible,textarea:focus-visible{outline:2px solid var(--paars-licht);outline-offset:2px}
+textarea{width:100%;font:inherit;font-size:16px;border-radius:10px;border:1px solid var(--rand);background:#000;color:var(--tekst);padding:10px;min-height:58px;resize:vertical}
+.uur{display:grid;gap:6px;padding:10px 0;border-top:1px solid var(--rand)}
+.uur:first-of-type{border-top:0;padding-top:0}
+.uur label{font-weight:800;color:var(--paars-licht);font-variant-numeric:tabular-nums}
+#log{font-size:13px;color:var(--zacht);max-height:200px;overflow:auto}
+#log div{padding:5px 0;border-bottom:1px solid var(--rand)}
+#log .ok{color:var(--groen)}#log .fout{color:var(--rood)}
+</style>
+</head>
+<body>
+<div class="kop"><h1>LUSTRUM TIMER</h1><div class="status"><span class="punt" id="punt"></span><span id="statustekst">verbinden…</span></div></div>
+
+<div class="kaart">
+  <h2>Volgende moment</h2>
+  <div class="aftel" id="aftel">--:--</div>
+  <div class="klein" id="aftelwat"></div>
+  <div class="klein" id="schermstatus">Nog geen reactie van het scherm. Tik op "Test scherm".</div>
+</div>
+
+<div class="kaart">
+  <h2>Tekst onder de timer</h2>
+  <textarea id="mededeling" placeholder="Bijv. Nog 1 rondje!"></textarea>
+  <div class="rij" style="margin-top:8px">
+    <button id="toon">Zet op scherm</button>
+    <button class="rand" id="weg">Weghalen</button>
+  </div>
+</div>
+
+<div class="kaart">
+  <h2>Tekst op 0 (1 minuut in beeld)</h2>
+  <div class="klein" style="margin:-4px 0 10px">Eerste regel groot, volgende regels kleiner.</div>
+  <div id="uren"></div>
+</div>
+
+<div class="kaart">
+  <h2>Nu tonen</h2>
+  <div class="rij">
+    <button id="feest">Toon tekst van het uur</button>
+    <button class="rand" id="stop">Stop, terug naar timer</button>
+  </div>
+</div>
+
+<div class="kaart">
+  <h2>Klok laptop bijstellen</h2>
+  <div class="rij">
+    <button class="rand" data-klok="-1">−1 s</button>
+    <button class="rand" data-klok="+1">+1 s</button>
+    <button class="rand" data-klok="0">Reset</button>
+    <button class="rand" id="ping">Test scherm</button>
+  </div>
+</div>
+
+<div class="kaart">
+  <h2>Logboek</h2>
+  <div id="log"></div>
+</div>
+
+<script>
+"use strict";
+const KANAAL = "asc-avsv-xxxv-ouzmrgufthb6wl";
+const NTFY = "https://ntfy.sh";
+const MOMENTEN = [new Date(2026,10,26,21,35), new Date(2026,10,26,22,35), new Date(2026,10,26,23,35), new Date(2026,10,27,0,35), new Date(2026,10,27,1,35)];
+const STANDAARD = ["PROOST!", "PROOST!", "PROOST!", "PROOST!", "PROOST!"];
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, "0");
+const hhmm = d => pad(d.getHours()) + ":" + pad(d.getMinutes());
+
+function log(t, soort){
+  const d = document.createElement("div"), n = new Date();
+  d.textContent = pad(n.getHours()) + ":" + pad(n.getMinutes()) + ":" + pad(n.getSeconds()) + "  " + t;
+  if (soort) d.className = soort;
+  $("log").prepend(d);
+}
+function zetStatus(s, t){ $("punt").className = "punt " + s; $("statustekst").textContent = t; }
+async function stuur(cmd){
+  try {
+    const r = await fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body: cmd });
+    if (!r.ok) throw new Error("fout " + r.status);
+    log("Verstuurd: " + cmd.replace(/\n/g, " | "));
+  } catch(e) { log("Niet verstuurd (" + e.message + "). Heb je internet?", "fout"); }
+}
+
+MOMENTEN.forEach((m, i) => {
+  const box = document.createElement("div"); box.className = "uur";
+  const l = document.createElement("label"); l.textContent = hhmm(m); l.htmlFor = "uur" + i;
+  const ta = document.createElement("textarea"); ta.id = "uur" + i; ta.value = STANDAARD[i];
+  const b = document.createElement("button"); b.className = "rand"; b.textContent = "Opslaan voor " + hhmm(m);
+  b.onclick = () => stuur("UUR" + (i + 1) + " " + (ta.value.trim() || STANDAARD[i]));
+  box.append(l, ta, b); $("uren").append(box);
+});
+$("toon").onclick = () => { const v = $("mededeling").value.trim(); if (v) stuur("TEKST " + v); };
+$("weg").onclick = () => stuur("WEG");
+$("feest").onclick = () => stuur("FEEST");
+$("stop").onclick = () => stuur("STOP");
+$("ping").onclick = () => stuur("PING");
+document.querySelectorAll("[data-klok]").forEach(b => b.onclick = () => stuur("KLOK " + b.dataset.klok));
+
+// Laatste opgeslagen teksten ophalen uit het kanaal + reacties van het scherm tonen
+const start = Date.now();
+try {
+  const bron = new EventSource(NTFY + "/" + encodeURIComponent(KANAAL) + "/sse?since=12h");
+  bron.onopen = () => zetStatus("ok", "verbonden");
+  bron.onerror = () => zetStatus("fout", "geen verbinding");
+  bron.onmessage = e => {
+    let b; try { b = JSON.parse(e.data); } catch(x) { return; }
+    if (b.event !== "message") return;
+    const msg = String(b.message);
+    if (msg.startsWith("✓")) {
+      if (b.time * 1000 > start - 5000) { log("Scherm: " + msg.slice(2), "ok"); $("schermstatus").textContent = "Scherm: " + msg.slice(2); }
+      return;
+    }
+    const m = msg.match(/^UUR([1-5])\s*([\s\S]*)$/i);
+    if (m) $("uur" + (m[1] - 1)).value = m[2].replace(/\s*\|\s*/g, "\n").trim() || STANDAARD[m[1] - 1];
+    const t = msg.match(/^TEKST\s+([\s\S]+)$/i);
+    if (t) $("mededeling").value = t[1].replace(/\s*\|\s*/g, "\n").trim();
+  };
+} catch(e) { zetStatus("fout", "geen verbinding"); }
+
+setInterval(() => {
+  const t = Date.now(), i = MOMENTEN.findIndex(m => m.getTime() > t);
+  if (i === -1) { $("aftel").textContent = "00:00"; $("aftelwat").textContent = "Alle momenten zijn geweest."; return; }
+  const s = Math.ceil((MOMENTEN[i] - t) / 1000), u = Math.floor(s / 3600);
+  $("aftel").textContent = (u ? u + ":" : "") + pad(Math.floor(s % 3600 / 60)) + ":" + pad(s % 60);
+  $("aftelwat").textContent = "tot " + hhmm(MOMENTEN[i]) + " · moment " + (i + 1) + " van 5 (klok telefoon)";
+}, 250);
+</script>
+</body>
+</html>

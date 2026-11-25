@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lustrum Timer</title>
+<style>
+:root{
+  --zwart:#000;
+  --aan:#6a1fc2;          /* donkerpaarse LED-cijfers */
+  --gloed:rgba(106,31,194,.55);
+  --uit:#100818;          /* uitgeschakelde segmenten, net zichtbaar */
+  --tekst:#7a2ed6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--zwart)}
+body{color:var(--tekst);font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;cursor:none;user-select:none}
+#timer{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5vh}
+#cijfers{width:88vw;max-height:70vh}
+#cijfers svg{width:100%;height:auto;max-height:70vh;display:block;overflow:visible}
+#cijfers .aan{fill:var(--aan);filter:drop-shadow(0 0 .6vw var(--gloed))}
+#cijfers .uit{fill:var(--uit)}
+#mededeling{font-size:4.5vw;font-weight:700;text-align:center;white-space:pre-line;padding:0 5vw;min-height:0}
+#mededeling:empty{display:none}
+#bericht{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:0 6vw}
+#bericht.aan{display:flex}
+#timer.weg{display:none}
+#berichtTekst .r1{font-size:12vw;font-weight:900;line-height:1.02;letter-spacing:-.01em;color:var(--tekst);text-shadow:0 0 2vw var(--gloed)}
+#berichtTekst .rn{font-size:5vw;font-weight:700;line-height:1.15;margin-top:2vh;color:var(--tekst)}
+#start{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;cursor:pointer;text-align:center;color:#666;font-size:1.6vw}
+#start b{color:var(--tekst);font-size:2.4vw}
+#hulp{position:fixed;inset:8vh 12vw;background:#0b0b0b;border:1px solid #333;border-radius:1.5vh;padding:4vh 4vw;display:none;z-index:40;font-size:1.5vw;line-height:1.8;color:#bbb;cursor:default}
+#hulp.aan{display:block}
+#hulp h2{color:var(--tekst);margin-bottom:1vh}
+#hulp kbd{background:#222;border-radius:.5vh;padding:.1vh .7vw;font-family:inherit;color:#fff}
+#testlabel{position:fixed;top:1vh;left:1vw;color:#a33;font-weight:800;font-size:1.2vw;display:none;z-index:60}
+</style>
+</head>
+<body>
+<div id="testlabel">TESTMODUS</div>
+<div id="start"><b>Klik om te starten</b>Volledig scherm · scherm blijft wakker · druk H voor hulp</div>
+
+<div id="timer"><div id="cijfers"></div><div id="mededeling"></div></div>
+<div id="bericht"><div id="berichtTekst"></div></div>
+
+<div id="hulp">
+  <h2>Lustrum Timer</h2>
+  <kbd>F</kbd> tekst van het uur nu tonen (1 min) · <kbd>S</kbd> stoppen ·
+  <kbd>T</kbd> tekst onder timer · <kbd>W</kbd> tekst weg<br>
+  <kbd>+</kbd>/<kbd>-</kbd> klok ±1 s · <kbd>0</kbd> correctie op 0 · <kbd>V</kbd> volledig scherm · <kbd>H</kbd> sluiten<br><br>
+  Klok laptop: <span id="hKlok"></span> <span id="hCorr"></span><br>
+  Afstandsbediening: <span id="hVerb"></span><br>
+  Tijden: <span id="hTijden"></span><br>
+  Kanaal: <span id="hKanaal"></span>
+</div>
+
+<script>
+"use strict";
+/* ============ INSTELLINGEN ============ */
+const KANAAL = "asc-avsv-xxxv-ouzmrgufthb6wl";   // zelfde als in bediening.html
+const NTFY = "https://ntfy.sh";
+let MOMENTEN = [   // lokale tijd laptop; maand 10 = november
+  new Date(2026, 10, 26, 21, 35, 0),
+  new Date(2026, 10, 26, 22, 35, 0),
+  new Date(2026, 10, 26, 23, 35, 0),
+  new Date(2026, 10, 27,  0, 35, 0),
+  new Date(2026, 10, 27,  1, 35, 0),
+];
+const TOON_DUUR = 60 * 1000;   // tekst van het uur 1 minuut in beeld
+const STANDAARD = ["PROOST!", "PROOST!", "PROOST!", "PROOST!", "PROOST!"];
+
+const P = new URLSearchParams(location.search);
+const TEST = P.has("test");
+if (TEST) {   // ?test → elke 2 minuten een moment, eerste binnen ~1 minuut
+  const basis = Math.ceil((Date.now() + 45000) / 60000) * 60000;
+  MOMENTEN = [0,1,2,3,4].map(i => new Date(basis + i * 120000));
+  document.getElementById("testlabel").style.display = "block";
+}
+
+/* ============ TOESTAND ============ */
+const SLEUTEL = "lustrumtimer2-" + KANAAL + (TEST ? "-test" : "");
+let staat = { teksten: STANDAARD.slice(), mededeling: "", correctie: 0 };
+try { const s = JSON.parse(localStorage.getItem(SLEUTEL)); if (s) Object.assign(staat, s); } catch(e) {}
+const bewaar = () => { try { localStorage.setItem(SLEUTEL, JSON.stringify(staat)); } catch(e) {} };
+let handmatig = null, gestopt = -1;
+const nu = () => Date.now() + staat.correctie;
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, "0");
+const hhmm = d => pad(d.getHours()) + ":" + pad(d.getMinutes());
+
+/* ============ LED-CIJFERS (7 segmenten, zelf getekend) ============ */
+const H = (cy) => `8,${cy} 14,${cy-6} 46,${cy-6} 52,${cy} 46,${cy+6} 14,${cy+6}`;
+const V = (cx, y1, y2) => `${cx},${y1} ${cx+6},${y1+6} ${cx+6},${y2-6} ${cx},${y2} ${cx-6},${y2-6} ${cx-6},${y1+6}`;
+const SEG = { a:H(6), g:H(50), d:H(94), b:V(54,8,48), c:V(54,52,92), f:V(6,8,48), e:V(6,52,92) };
+const CIJFER = { "0":"abcdef","1":"bc","2":"abged","3":"abgcd","4":"fgbc","5":"afgcd","6":"afgedc","7":"abc","8":"abcdefg","9":"abcdfg" };
+const DW = 60, GAP = 14, CW = 22;
+let vorigeTekst = "";
+function tekenCijfers(tekst){
+  if (tekst === vorigeTekst) return;
+  vorigeTekst = tekst;
+  let x = 0, delen = [];
+  for (const ch of tekst) {
+    if (ch === ":") {
+      delen.push(`<rect class="aan" x="${x+5}" y="26" width="12" height="12"/><rect class="aan" x="${x+5}" y="62" width="12" height="12"/>`);
+      x += CW + GAP;
+    } else {
+      const aan = CIJFER[ch] || "";
+      for (const s in SEG) delen.push(`<polygon class="${aan.includes(s) ? "aan" : "uit"}" points="${SEG[s]}" transform="translate(${x},0)"/>`);
+      x += DW + GAP;
+    }
+  }
+  const breed = x - GAP;
+  $("cijfers").innerHTML = `<svg viewBox="-6 -2 ${breed+12} 104" preserveAspectRatio="xMidYMid meet"><g transform="skewX(-5) translate(5,0)">${delen.join("")}</g></svg>`;
+}
+
+/* ============ WEERGAVE ============ */
+function zetBericht(tekst){
+  const el = $("berichtTekst"); el.textContent = "";
+  String(tekst).split("\n").forEach((r, i) => {
+    const d = document.createElement("div"); d.className = i ? "rn" : "r1"; d.textContent = r; el.appendChild(d);
+  });
+}
+let huidig = "";
+function toon(wat, index){
+  const sleutel = wat + index + (wat === "bericht" ? staat.teksten[index] : "");
+  if (sleutel === huidig) return;
+  huidig = sleutel;
+  if (wat === "bericht") zetBericht(staat.teksten[index] || "PROOST!");
+  $("bericht").classList.toggle("aan", wat === "bericht");
+  $("timer").classList.toggle("weg", wat === "bericht");
+}
+function tick(){
+  const t = nu();
+  if (handmatig && t < handmatig.tot) return toon("bericht", handmatig.index);
+  handmatig = null;
+  for (let i = 0; i < MOMENTEN.length; i++) {
+    const m = MOMENTEN[i].getTime();
+    if (t >= m && t < m + TOON_DUUR && gestopt !== i) return toon("bericht", i);
+  }
+  toon("timer", 0);
+  const i = MOMENTEN.findIndex(m => m.getTime() > t);
+  if (i === -1) { tekenCijfers("00:00"); return; }   // na 01:35 blijft 00:00 staan
+  const sec = Math.ceil((MOMENTEN[i].getTime() - t) / 1000);   // precies op het moment: 0
+  const u = Math.floor(sec / 3600), mi = Math.floor(sec % 3600 / 60), s = sec % 60;
+  tekenCijfers(u > 0 ? u + ":" + pad(mi) + ":" + pad(s) : pad(mi) + ":" + pad(s));
+}
+function tekenMededeling(){ $("mededeling").textContent = staat.mededeling || ""; }
+
+/* ============ COMMANDO'S ============ */
+// FEEST [n] · STOP · TEKST ... · WEG · UUR1..UUR5 ... ("|" = nieuwe regel) · KLOK +n/-n/0 · PING
+function laatsteIndex(){ const t = nu(); let x = 0; MOMENTEN.forEach((m, i) => { if (m.getTime() <= t) x = i; }); return x; }
+function voerUit(regel, live){
+  regel = String(regel || "").replace(/\r/g, "").replace(/\s*\|\s*/g, "\n").trim();
+  const m = regel.match(/^(\S+)\s*([\s\S]*)$/); if (!m) return null;
+  const cmd = m[1].toUpperCase(), rest = m[2].trim();
+  let a = null;
+  if (cmd === "TEKST" || cmd === "GROOT") { staat.mededeling = rest; bewaar(); tekenMededeling(); a = rest ? "Tekst staat onder de timer" : "Tekst weggehaald"; }
+  else if (cmd === "WEG") { staat.mededeling = ""; bewaar(); tekenMededeling(); a = "Tekst weggehaald"; }
+  else if (/^UUR[1-5]$/.test(cmd)) { const i = +cmd[3] - 1; staat.teksten[i] = rest || STANDAARD[i]; bewaar(); a = "Tekst voor " + hhmm(MOMENTEN[i]) + " opgeslagen"; }
+  else if (cmd === "KLOK") {
+    if (rest === "0") staat.correctie = 0;
+    else { const n = parseFloat(rest.replace(",", ".")); if (!isNaN(n)) staat.correctie += Math.round(n * 1000); }
+    bewaar(); a = "Klokcorrectie " + staat.correctie / 1000 + " s";
+  }
+  else if (cmd === "FEEST") { if (!live) return null; let i = parseInt(rest, 10); i = i >= 1 && i <= 5 ? i - 1 : laatsteIndex(); handmatig = { tot: nu() + TOON_DUUR, index: i }; gestopt = -1; a = "Tekst van " + hhmm(MOMENTEN[i]) + " staat in beeld"; }
+  else if (cmd === "STOP") { if (!live) return null; handmatig = null; const t = nu(); MOMENTEN.forEach((mm, i) => { if (t >= mm.getTime() && t < mm.getTime() + TOON_DUUR) gestopt = i; }); a = "Gestopt, timer staat weer in beeld"; }
+  else if (cmd === "PING") { if (!live) return null; a = "Scherm actief"; }
+  else return null;
+  tick();
+  return a + " · " + status();
+}
+function status(){
+  const t = nu(), d = new Date(t), i = MOMENTEN.findIndex(m => m.getTime() > t);
+  const wat = $("bericht").classList.contains("aan") ? "tekst in beeld" : i === -1 ? "afgelopen" : "aftellen naar " + hhmm(MOMENTEN[i]);
+  return wat + ", klok " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+}
+
+/* ============ AFSTANDSBEDIENING via ntfy.sh ============ */
+const geladen = Date.now(), gezien = new Set();
+let verbonden = false;
+function verbind(){
+  if (P.has("offline")) return;
+  try {
+    const bron = new EventSource(NTFY + "/" + encodeURIComponent(KANAAL) + "/sse?since=12h");
+    bron.onopen = () => verbonden = true;
+    bron.onerror = () => verbonden = false;
+    bron.onmessage = e => {
+      let b; try { b = JSON.parse(e.data); } catch(x) { return; }
+      if (b.event !== "message" || !b.id || gezien.has(b.id)) return;
+      gezien.add(b.id);
+      const live = b.time * 1000 > geladen - 5000;
+      const a = voerUit(b.message, live);
+      if (a && live) fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body: "✓ " + a }).catch(() => {});
+    };
+  } catch(e) {}
+}
+
+/* ============ TOETSENBORD / START ============ */
+document.addEventListener("keydown", e => {
+  if ($("start").style.display !== "none") return;
+  const k = e.key.toLowerCase();
+  if (k === "h" || (k === "escape" && $("hulp").classList.contains("aan"))) {
+    const d = new Date(nu());
+    $("hKlok").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("hCorr").textContent = staat.correctie ? "(correctie " + staat.correctie / 1000 + " s)" : "";
+    $("hVerb").textContent = verbonden ? "verbonden ✓" : "niet verbonden (timer loopt gewoon door)";
+    $("hulp").classList.toggle("aan");
+    document.body.style.cursor = $("hulp").classList.contains("aan") ? "default" : "none";
+    return;
+  }
+  if (k === "f") voerUit("FEEST", true);
+  else if (k === "s") voerUit("STOP", true);
+  else if (k === "w") voerUit("WEG", true);
+  else if (k === "t") { const x = prompt("Tekst onder de timer:", staat.mededeling); if (x !== null) voerUit("TEKST " + x, true); }
+  else if (k === "+" || k === "=") voerUit("KLOK +1", true);
+  else if (k === "-") voerUit("KLOK -1", true);
+  else if (k === "0") voerUit("KLOK 0", true);
+  else if (k === "v") { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch(x) {} }
+});
+async function wakker(){ try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch(e) {} }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") wakker(); });
+$("start").addEventListener("click", () => {
+  $("start").style.display = "none";
+  try { document.documentElement.requestFullscreen(); } catch(e) {}
+  wakker();
+});
+
+$("hTijden").textContent = MOMENTEN.map(hhmm).join(", ");
+$("hKanaal").textContent = KANAAL;
+tekenMededeling();
+tick();
+setInterval(tick, 100);
+verbind();
+</script>
+</body>
+</html>
