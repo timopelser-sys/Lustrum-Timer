@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <title>Lustrum Bediening</title>
 <style>
-:root{--zwart:#000;--kaart:#0d0a12;--rand:#241a33;--paars:#6a1fc2;--paars-licht:#a774ef;--tekst:#eee;--zacht:#8b80a0;--groen:#2fa95a;--groen-licht:#3ecf6a;--rood:#e5484d}
+:root{--zwart:#000;--kaart:#0d0a12;--rand:#241a33;--paars:#6a1fc2;--paars-licht:#a774ef;--tekst:#eee;--zacht:#8b80a0;--groen:#2fa95a;--groen-licht:#3ecf6a;--rood:#e5484d;--oranje:#e5a24d}
 *{box-sizing:border-box}
 html{background:var(--zwart)}
 body{margin:0 auto;max-width:560px;background:var(--zwart);color:var(--tekst);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
@@ -28,9 +28,11 @@ button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:13px 12p
 button.rand{background:transparent;border:1px solid var(--rand);color:var(--tekst)}
 button.ja{background:var(--groen)}
 button.nee{background:transparent;border:1px solid var(--rood);color:var(--rood)}
+button.mini{flex:none;padding:8px 12px;font-size:13px}
+button:disabled{opacity:.45}
 button:active{transform:scale(.98)}
-button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--paars-licht);outline-offset:2px}
-textarea,input{width:100%;font:inherit;font-size:16px;border-radius:10px;border:1px solid var(--rand);background:#000;color:var(--tekst);padding:10px}
+button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--paars-licht);outline-offset:2px}
+textarea,input,select{width:100%;font:inherit;font-size:16px;border-radius:10px;border:1px solid var(--rand);background:#000;color:var(--tekst);padding:10px}
 textarea{min-height:58px;resize:vertical}
 .uur{display:grid;gap:6px;padding:10px 0;border-top:1px solid var(--rand)}
 .uur:first-of-type{border-top:0;padding-top:0}
@@ -40,6 +42,15 @@ textarea{min-height:58px;resize:vertical}
 .inz img{width:100%;max-height:340px;object-fit:contain;border-radius:10px;background:#000}
 .inz .tekst{font-size:17px;font-weight:600;white-space:pre-line;overflow-wrap:anywhere}
 .inz .meta{font-size:12px;color:var(--zacht)}
+/* compacte regels voor "nu op het bord" en mededelingen */
+.item{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--rand)}
+.item:first-child{border-top:0}
+.item img{width:52px;height:52px;object-fit:cover;border-radius:8px;flex:none;background:#111}
+.item .wat{flex:1;min-width:0;font-size:14px;overflow-wrap:anywhere;white-space:pre-line}
+.item .wat small{display:block;color:var(--zacht);font-size:12px}
+.item.beheer .wat{font-family:Bahnschrift,"Arial Narrow","Roboto Condensed",sans-serif;text-transform:uppercase;font-weight:700;color:#fff}
+.item.beheer{background:linear-gradient(90deg,rgba(106,31,194,.25),transparent);border-radius:8px;padding-left:8px;border-top:0;margin-top:6px}
+.sub{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--zacht);margin:12px 0 4px}
 .leeg{color:var(--zacht);font-size:14px}
 #log{font-size:13px;color:var(--zacht);max-height:200px;overflow:auto}
 #log div{padding:5px 0;border-bottom:1px solid var(--rand)}
@@ -58,13 +69,42 @@ textarea{min-height:58px;resize:vertical}
 
 <div id="alles" hidden>
 <div class="kaart">
-  <h2>Inzendingen <span class="badge" id="aantal"></span></h2>
+  <h2>Te beoordelen <span class="badge" id="aantal"></span></h2>
   <div id="inzendingen"><div class="leeg">Nog geen nieuwe inzendingen.</div></div>
+</div>
+
+<div class="kaart">
+  <h2>Nu op het bord <span class="badge" id="aantalOp"></span></h2>
+  <div id="opBord"><div class="leeg">Nog geen status van het scherm. Tik op "Ververs".</div></div>
   <div class="rij" style="margin-top:10px">
-    <button class="rand" id="overslaan">Haal huidige van bord</button>
-    <button class="rand" id="rijleeg">Wachtrij leeg</button>
-    <button class="rand" id="qrAan">QR aan</button>
-    <button class="rand" id="qrUit">QR uit</button>
+    <button class="rand" id="ververs">Ververs</button>
+    <button class="nee" id="bordleeg">Alles van bord</button>
+    <button class="nee" id="rijleeg">Rij leeg</button>
+  </div>
+  <div class="klein" id="bordTijd"></div>
+</div>
+
+<div class="kaart">
+  <h2>Jouw mededelingen</h2>
+  <div class="klein" style="margin:-4px 0 10px">Staan als paarse kaartjes met "📣 MEDEDELING" op het bord, tot je ze weghaalt.</div>
+  <textarea id="mededeling" maxlength="160" placeholder="Bijv. Bar sluit om 02:00"></textarea>
+  <div class="rij" style="margin-top:8px"><button id="plaats">Plaats op het bord</button></div>
+  <div id="beheerLijst" style="margin-top:8px"></div>
+</div>
+
+<div class="kaart">
+  <h2>Instellingen bord</h2>
+  <label class="klein" for="duur" style="display:block;margin:0 0 6px">Hoe lang blijft een geaccepteerde inzending staan?</label>
+  <select id="duur">
+    <option value="20">20 seconden</option>
+    <option value="60">1 minuut</option>
+    <option value="120">2 minuten</option>
+    <option value="300">5 minuten</option>
+    <option value="0">Tot ik hem weghaal</option>
+  </select>
+  <div class="rij" style="margin-top:10px">
+    <button class="rand" id="qrAan">QR-code aan</button>
+    <button class="rand" id="qrUit">QR-code uit</button>
   </div>
 </div>
 
@@ -73,15 +113,6 @@ textarea{min-height:58px;resize:vertical}
   <div class="aftel" id="aftel">--:--</div>
   <div class="klein" id="aftelwat"></div>
   <div class="klein" id="schermstatus">Nog geen reactie van het scherm. Tik op "Test scherm".</div>
-</div>
-
-<div class="kaart">
-  <h2>Tekst onder de timer</h2>
-  <textarea id="mededeling" placeholder="Bijv. Nog 1 rondje!"></textarea>
-  <div class="rij" style="margin-top:8px">
-    <button id="toon">Zet op scherm</button>
-    <button class="rand" id="weg">Weghalen</button>
-  </div>
 </div>
 
 <div class="kaart">
@@ -126,6 +157,7 @@ const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, "0");
 const NL = new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", hour: "2-digit", minute: "2-digit", hour12: false });
 const hhmm = d => NL.format(d);
+const el = (tag, cls, tekst) => { const e = document.createElement(tag); if (cls) e.className = cls; if (tekst != null) e.textContent = tekst; return e; };
 
 /* ---------- geheime code: uit de link (#code) of eerder opgeslagen ---------- */
 let CODE = decodeURIComponent(location.hash.slice(1)).trim().toLowerCase();
@@ -142,9 +174,7 @@ $("andereCode").onclick = () => { try { localStorage.removeItem("lustrum-code");
 const KANAAL = CODE ? "lustrum-" + CODE : "";
 
 function log(t, soort){
-  const d = document.createElement("div"), n = new Date();
-  d.textContent = pad(n.getHours()) + ":" + pad(n.getMinutes()) + ":" + pad(n.getSeconds()) + "  " + t;
-  if (soort) d.className = soort;
+  const n = new Date(), d = el("div", soort, pad(n.getHours()) + ":" + pad(n.getMinutes()) + ":" + pad(n.getSeconds()) + "  " + t);
   $("log").prepend(d);
 }
 function zetStatus(s, t){ $("punt").className = "punt " + s; $("statustekst").textContent = t; }
@@ -160,55 +190,95 @@ async function stuur(cmd, stil){
 if (CODE) {
   $("alles").hidden = false;
 
+  /* ---------- teksten per uur ---------- */
   MOMENTEN.forEach((m, i) => {
-    const box = document.createElement("div"); box.className = "uur";
-    const l = document.createElement("label"); l.textContent = hhmm(m); l.htmlFor = "uur" + i;
-    const ta = document.createElement("textarea"); ta.id = "uur" + i; ta.value = STANDAARD[i];
-    const b = document.createElement("button"); b.className = "rand"; b.textContent = "Opslaan voor " + hhmm(m);
+    const box = el("div", "uur");
+    const l = el("label", "", hhmm(m)); l.htmlFor = "uur" + i;
+    const ta = el("textarea"); ta.id = "uur" + i; ta.value = STANDAARD[i];
+    const b = el("button", "rand", "Opslaan voor " + hhmm(m));
     b.onclick = () => stuur("UUR" + (i + 1) + " " + (ta.value.trim() || STANDAARD[i]));
     box.append(l, ta, b); $("uren").append(box);
   });
-  $("toon").onclick = () => { const v = $("mededeling").value.trim(); if (v) stuur("TEKST " + v); };
-  $("weg").onclick = () => stuur("WEG");
   $("feest").onclick = () => stuur("FEEST");
   $("stop").onclick = () => stuur("STOP");
   $("ping").onclick = () => stuur("PING");
-  $("overslaan").onclick = () => stuur("OVERSLAAN");
-  $("rijleeg").onclick = () => { if (confirm("Alle geaccepteerde inzendingen die nog wachten van de wachtrij halen?")) stuur("RIJLEEG"); };
+  $("ververs").onclick = () => stuur("PING");
+  $("bordleeg").onclick = () => { if (confirm("Alle inzendingen van gasten van het bord halen? (Jouw mededelingen blijven staan.)")) stuur("BORDLEEG"); };
+  $("rijleeg").onclick = () => { if (confirm("Alle geaccepteerde inzendingen die nog in de rij wachten verwijderen?")) stuur("RIJLEEG"); };
   $("qrAan").onclick = () => stuur("QR AAN");
   $("qrUit").onclick = () => stuur("QR UIT");
+  $("duur").onchange = () => stuur("DUUR " + $("duur").value);
   document.querySelectorAll("[data-klok]").forEach(b => b.onclick = () => stuur("KLOK " + b.dataset.klok));
+  $("plaats").onclick = async () => {
+    const v = $("mededeling").value.trim(); if (!v) return;
+    if (await stuur("BEHEER " + JSON.stringify({ id: "b" + Date.now().toString(36), tekst: v }))) $("mededeling").value = "";
+  };
 
-  /* ---------- inzendingen beoordelen ---------- */
-  const inzendingen = new Map();   // id -> {naam, tekst, foto, tijd}
+  /* ---------- gegevens ---------- */
+  const inzendingen = new Map();   // id -> {naam, tekst, foto, tijd}  (van gasten, uit de inbox)
+  const geaccepteerd = new Map();  // id -> {naam, tekst, foto}        (uit TOON-berichten)
   const besloten = new Set();
+  let bord = null, bordTijd = 0;   // laatste stand van het scherm
+  const verwijderd = new Set();    // net op "haal weg" getikt, nog niet bevestigd
+
+  /* ---------- te beoordelen ---------- */
   function tekenInzendingen(){
     const box = $("inzendingen"); box.textContent = "";
     const open = [...inzendingen.entries()].filter(([id]) => !besloten.has(id)).sort((a, b) => a[1].tijd - b[1].tijd);
     $("aantal").textContent = open.length || "";
     document.title = (open.length ? "(" + open.length + ") " : "") + "Lustrum Bediening";
-    if (!open.length) { const d = document.createElement("div"); d.className = "leeg"; d.textContent = "Nog geen nieuwe inzendingen."; box.append(d); return; }
+    if (!open.length) { box.append(el("div", "leeg", "Nog geen nieuwe inzendingen.")); return; }
     for (const [id, z] of open) {
-      const kaart = document.createElement("div"); kaart.className = "inz";
-      if (z.foto) { const img = document.createElement("img"); img.src = z.foto; img.alt = "Ingestuurde foto"; img.loading = "lazy"; kaart.append(img); }
-      if (z.tekst) { const t = document.createElement("div"); t.className = "tekst"; t.textContent = z.tekst; kaart.append(t); }
-      const meta = document.createElement("div"); meta.className = "meta";
-      meta.textContent = (z.naam ? z.naam + " · " : "") + "ingestuurd " + hhmm(new Date(z.tijd * 1000));
-      const rij = document.createElement("div"); rij.className = "rij";
-      const ja = document.createElement("button"); ja.className = "ja"; ja.textContent = "Accepteren";
-      const nee = document.createElement("button"); nee.className = "nee"; nee.textContent = "Weigeren";
+      const kaart = el("div", "inz");
+      if (z.foto) { const img = el("img"); img.src = z.foto; img.alt = "Ingestuurde foto"; img.loading = "lazy"; kaart.append(img); }
+      if (z.tekst) kaart.append(el("div", "tekst", z.tekst));
+      kaart.append(el("div", "meta", (z.naam ? z.naam + " · " : "") + "ingestuurd " + hhmm(new Date(z.tijd * 1000))));
+      const rij = el("div", "rij");
+      const ja = el("button", "ja", "Accepteren"), nee = el("button", "nee", "Weigeren");
       ja.onclick = async () => {
         ja.disabled = nee.disabled = true;
         const ok = await stuur("TOON " + JSON.stringify({ id, naam: z.naam, tekst: z.tekst, foto: z.foto }), true);
-        if (ok) { besloten.add(id); stuur("BESLUIT " + id + " ja", true); log("Geaccepteerd: " + (z.tekst || "foto").slice(0, 40), "ok"); tekenInzendingen(); }
+        if (ok) { besloten.add(id); geaccepteerd.set(id, z); stuur("BESLUIT " + id + " ja", true); log("Geaccepteerd: " + (z.tekst || "foto").slice(0, 40), "ok"); tekenInzendingen(); }
         else ja.disabled = nee.disabled = false;
       };
       nee.onclick = () => { besloten.add(id); stuur("BESLUIT " + id + " nee", true); log("Geweigerd: " + (z.tekst || "foto").slice(0, 40)); tekenInzendingen(); };
       rij.append(ja, nee);
-      kaart.append(meta, rij);
+      kaart.append(rij);
       box.append(kaart);
     }
   }
+
+  /* ---------- nu op het bord + mededelingen ---------- */
+  function regel(id, z, knopTekst, cmd, soort){
+    const r = el("div", "item" + (soort ? " " + soort : ""));
+    if (z && z.foto) { const img = el("img"); img.src = z.foto; img.alt = ""; r.append(img); }
+    const wat = el("div", "wat", z ? (z.tekst || (z.foto ? "(foto)" : "")) : "(inhoud onbekend)");
+    if (z && z.naam) wat.append(el("small", "", z.naam));
+    const b = el("button", "nee mini", knopTekst);
+    b.onclick = async () => { b.disabled = true; verwijderd.add(id); if (await stuur(cmd + " " + id)) tekenBord(); else { verwijderd.delete(id); b.disabled = false; } };
+    r.append(wat, b);
+    return r;
+  }
+  function tekenBord(){
+    const box = $("opBord"), lijst = $("beheerLijst");
+    if (!bord) return;
+    box.textContent = ""; lijst.textContent = "";
+    const op = bord.op.filter(id => !verwijderd.has(id)), rij = bord.rij.filter(id => !verwijderd.has(id));
+    $("aantalOp").textContent = op.length ? op.length + " / 20" : "";
+    if (!op.length && !rij.length) box.append(el("div", "leeg", "Er staan nu geen inzendingen van gasten op het bord."));
+    op.forEach(id => box.append(regel(id, geaccepteerd.get(id), "Haal weg", "WEGID")));
+    if (rij.length) {
+      box.append(el("div", "sub", "In de rij (" + rij.length + ")"));
+      rij.forEach(id => box.append(regel(id, geaccepteerd.get(id), "Uit rij", "WEGID")));
+    }
+    const beheer = bord.beheer.filter(b => !verwijderd.has(b.id));
+    if (!beheer.length) lijst.append(el("div", "leeg", "Je hebt nu geen mededelingen op het bord."));
+    beheer.forEach(b => lijst.append(regel(b.id, { tekst: b.tekst }, "Weghalen", "BEHEERWEG", "beheer")));
+    if (bord.duur != null && document.activeElement !== $("duur")) $("duur").value = String(bord.duur);
+    $("bordTijd").textContent = "Stand van het scherm om " + new Date(bordTijd).toLocaleTimeString("nl-NL", { timeZone: "Europe/Amsterdam" });
+  }
+
+  /* ---------- inbox van gasten ---------- */
   try {
     const inbox = new EventSource(NTFY + "/" + INBOX + "/sse?since=12h");
     inbox.onmessage = e => {
@@ -217,7 +287,7 @@ if (CODE) {
       let z = {}; try { z = JSON.parse(b.message); } catch(x) { z = { tekst: String(b.message || "") }; }
       if (typeof z !== "object" || !z) z = {};
       const foto = b.attachment && /^https:\/\//.test(b.attachment.url) && /^image\//.test(b.attachment.type || "image/") ? b.attachment.url : "";
-      const tekst = String(z.tekst || "").slice(0, 280), naam = String(z.naam || "").slice(0, 40);
+      const tekst = String(z.tekst || "").slice(0, 200), naam = String(z.naam || "").slice(0, 40);
       if (!tekst && !foto) return;
       inzendingen.set(b.id, { naam, tekst, foto, tijd: b.time });
       tekenInzendingen();
@@ -225,7 +295,7 @@ if (CODE) {
     };
   } catch(e) {}
 
-  /* ---------- eigen kanaal: teksten, besluiten en reacties van het scherm ---------- */
+  /* ---------- eigen kanaal: besluiten, geaccepteerde inhoud en stand van het scherm ---------- */
   const start = Date.now();
   try {
     const bron = new EventSource(NTFY + "/" + encodeURIComponent(KANAAL) + "/sse?since=12h");
@@ -236,15 +306,17 @@ if (CODE) {
       if (b.event !== "message") return;
       const msg = String(b.message);
       if (msg.startsWith("✓")) {
-        if (b.time * 1000 > start - 5000) { log("Scherm: " + msg.slice(2), "ok"); $("schermstatus").textContent = "Scherm: " + msg.slice(2); }
+        const [tekst, ...rest] = msg.slice(1).trim().split("\n#BORD");
+        if (rest.length) { try { bord = JSON.parse(rest.join("\n#BORD")); bordTijd = b.time * 1000; verwijderd.clear(); tekenBord(); } catch(x) {} }
+        if (b.time * 1000 > start - 5000 && tekst !== "Bord bijgewerkt") { log("Scherm: " + tekst.split(" · ")[0], "ok"); $("schermstatus").textContent = "Scherm: " + tekst; }
         return;
       }
+      const toon = msg.match(/^TOON\s+(\{[\s\S]*\})$/);
+      if (toon) { try { const z = JSON.parse(toon[1]); geaccepteerd.set(String(z.id), z); if (bord) tekenBord(); } catch(x) {} return; }
       const bes = msg.match(/^BESLUIT\s+(\S+)/);
       if (bes) { besloten.add(bes[1]); tekenInzendingen(); return; }
       const m = msg.match(/^UUR([1-5])\s*([\s\S]*)$/i);
       if (m) $("uur" + (m[1] - 1)).value = m[2].replace(/\s*\|\s*/g, "\n").trim() || STANDAARD[m[1] - 1];
-      const t = msg.match(/^TEKST\s+([\s\S]+)$/i);
-      if (t) $("mededeling").value = t[1].replace(/\s*\|\s*/g, "\n").trim();
     };
   } catch(e) { zetStatus("fout", "geen verbinding"); }
 
