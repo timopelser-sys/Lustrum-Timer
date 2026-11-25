@@ -67,7 +67,8 @@ body.zonderQR #qr, body.inBericht #qr{display:none}
   <kbd>T</kbd> tekst onder timer · <kbd>W</kbd> tekst weg<br>
   <kbd>Q</kbd> QR-code aan/uit · <kbd>N</kbd> inzending van het bord halen<br>
   <kbd>+</kbd>/<kbd>-</kbd> klok ±1 s · <kbd>0</kbd> correctie op 0 · <kbd>V</kbd> volledig scherm · <kbd>H</kbd> sluiten<br><br>
-  Klok laptop: <span id="hKlok"></span> <span id="hCorr"></span><br>
+  Klok: <span id="hKlok"></span> <span id="hCorr"></span><br>
+  Tijd: <span id="hSync"></span><br>
   Afstandsbediening: <span id="hVerb"></span><br>
   Tijden: <span id="hTijden"></span><br>
   Kanaal: <span id="hKanaal"></span>
@@ -80,12 +81,14 @@ body.zonderQR #qr, body.inBericht #qr{display:none}
 const CODE = decodeURIComponent(location.hash.slice(1)).trim().toLowerCase();
 const KANAAL = CODE ? "lustrum-" + CODE : "";
 const NTFY = "https://ntfy.sh";
-let MOMENTEN = [   // lokale tijd laptop; maand 10 = november
-  new Date(2026, 10, 26, 21, 35, 0),
-  new Date(2026, 10, 26, 22, 35, 0),
-  new Date(2026, 10, 26, 23, 35, 0),
-  new Date(2026, 10, 27,  0, 35, 0),
-  new Date(2026, 10, 27,  1, 35, 0),
+// Vaste momenten in Nederlandse tijd (CET = UTC+1 in november), onafhankelijk van de tijdzone van de laptop.
+// 21:35, 22:35, 23:35 (26 nov) en 00:35, 01:35 (27 nov) Nederlandse tijd:
+let MOMENTEN = [
+  new Date(Date.UTC(2026, 10, 26, 20, 35, 0)),
+  new Date(Date.UTC(2026, 10, 26, 21, 35, 0)),
+  new Date(Date.UTC(2026, 10, 26, 22, 35, 0)),
+  new Date(Date.UTC(2026, 10, 26, 23, 35, 0)),
+  new Date(Date.UTC(2026, 10, 27,  0, 35, 0)),
 ];
 const TOON_DUUR = 60 * 1000;   // tekst van het uur 1 minuut in beeld
 const INZ_DUUR = 20 * 1000;    // goedgekeurde inzending 20 seconden in beeld
@@ -106,10 +109,53 @@ let staat = { teksten: STANDAARD.slice(), mededeling: "", correctie: 0, qr: true
 try { const s = JSON.parse(localStorage.getItem(SLEUTEL)); if (s) Object.assign(staat, s); } catch(e) {}
 const bewaar = () => { try { localStorage.setItem(SLEUTEL, JSON.stringify(staat)); } catch(e) {} };
 let handmatig = null, gestopt = -1;
-const nu = () => Date.now() + staat.correctie;
+/* ============ OFFICIËLE TIJD ============
+   De timer vertrouwt niet blind op de klok van de laptop. Hij vraagt de tijd op bij de server
+   waar deze website staat (GitHub, gesynchroniseerd met atoomklokken via NTP) en meet hoeveel
+   de laptop afwijkt. Methode: ~15 snelle verzoeken rond een secondegrens; elk antwoord geeft
+   een interval waarin de afwijking moet liggen, de doorsnede daarvan is meestal < 0,1 s breed. */
+let sync = { offset: 0, fout: null, wanneer: 0, gelukt: false };
+try { const x = JSON.parse(localStorage.getItem("lustrum-sync")); if (x && x.gelukt && Date.now() - x.wanneer < 12 * 3600e3) sync = x; } catch(e) {}
+const wacht = ms => new Promise(r => setTimeout(r, ms));
+async function meetOfficieleTijd(){
+  if (!/^https?:$/.test(location.protocol)) return false;   // lokaal bestand: geen server om te vragen
+  let lo = -Infinity, hi = Infinity, n = 0;
+  for (let k = 0; k < 16; k++) {
+    const t0 = Date.now();
+    let r;
+    try { r = await fetch(location.pathname + "?tijd=" + t0 + k, { method: "HEAD", cache: "no-store" }); } catch(e) { await wacht(300); continue; }
+    const t1 = Date.now();
+    const d = Date.parse(r.headers.get("date") || "");
+    const leeftijd = parseInt(r.headers.get("age") || "0", 10);
+    if (!isNaN(d) && !(leeftijd > 0) && t1 - t0 < 1500) {
+      lo = Math.max(lo, d - t1);          // servertijd lag tussen t0 en t1, in de seconde [d, d+1000)
+      hi = Math.min(hi, d + 1000 - t0);
+      n++;
+    }
+    if (n >= 6 && hi - lo < 80) break;
+    await wacht(110 + Math.random() * 60);
+  }
+  if (n < 4 || !(hi >= lo) || hi - lo > 1500) return false;
+  sync = { offset: Math.round((lo + hi) / 2), fout: Math.round((hi - lo) / 2), wanneer: Date.now(), gelukt: true };
+  try { localStorage.setItem("lustrum-sync", JSON.stringify(sync)); } catch(e) {}
+  return true;
+}
+async function synchroniseer(){
+  const ok = await meetOfficieleTijd();
+  $("hSync") && ($("hSync").textContent = syncTekst());
+  return ok;
+}
+function syncTekst(){
+  if (!sync.gelukt) return "⚠ officiële tijd niet opgehaald, klok van de laptop wordt gebruikt";
+  const s = sync.offset / 1000;
+  return "officiële tijd ✓ (laptop " + (Math.abs(s) < 0.05 ? "loopt gelijk" : (s > 0 ? "loopt " + s.toFixed(2).replace(".", ",") + " s achter" : "loopt " + (-s).toFixed(2).replace(".", ",") + " s voor")) + ", nauwkeurig ±" + (sync.fout / 1000).toFixed(2).replace(".", ",") + " s)";
+}
+const nu = () => Date.now() + sync.offset + staat.correctie;
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, "0");
-const hhmm = d => pad(d.getHours()) + ":" + pad(d.getMinutes());
+const NL = new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+const nlTijd = t => NL.format(new Date(t));            // hh:mm:ss in Nederlandse tijd
+const hhmm = d => nlTijd(d).slice(0, 5);
 
 /* ============ LED-CIJFERS (7 segmenten, zelf getekend) ============ */
 const H = (cy) => `8,${cy} 14,${cy-6} 46,${cy-6} 52,${cy} 46,${cy+6} 14,${cy+6}`;
@@ -174,6 +220,7 @@ function tick(){
   if (inBeeld && (Date.now() >= inBeeld.tot || totMoment <= INZ_VRIJ)) inBeeld = null;
   if (!inBeeld && wachtrij.length && totMoment > INZ_VRIJ + 5000) {
     inBeeld = Object.assign(wachtrij.shift(), { tot: Date.now() + INZ_DUUR });
+    bewaarRij();
     zetInzending(inBeeld);
   }
   if (inBeeld) { toon("inzending", inBeeld.id); tekenCijfers(tijd, "kleineTimer"); return; }
@@ -182,6 +229,8 @@ function tick(){
 }
 /* ============ INZENDINGEN VAN GASTEN ============ */
 let wachtrij = [], inBeeld = null;
+try { const w = JSON.parse(localStorage.getItem(SLEUTEL + "-rij")); if (Array.isArray(w)) wachtrij = w; } catch(e) {}
+const bewaarRij = () => { try { localStorage.setItem(SLEUTEL + "-rij", JSON.stringify(wachtrij)); } catch(e) {} };
 function zetInzending(z){
   const f = $("inzFoto");
   if (z.foto && /^https:\/\//.test(z.foto)) { f.src = z.foto; f.hidden = false; } else { f.removeAttribute("src"); f.hidden = true; }
@@ -203,8 +252,11 @@ function voerUit(regel, live){
     if (!z || (!z.tekst && !z.foto)) return null;
     z = { id: String(z.id || Math.random()), naam: String(z.naam || "").slice(0, 40), tekst: String(z.tekst || "").slice(0, 280), foto: String(z.foto || "") };
     if (z.foto && !/^https:\/\//.test(z.foto)) z.foto = "";
-    wachtrij.push(z); tick();
-    return inBeeld && inBeeld.id === z.id ? "Inzending staat nu 20 s op het bord" : "Inzending in de rij (plek " + (wachtrij.length) + ")";
+    if ((inBeeld && inBeeld.id === z.id) || wachtrij.some(w => w.id === z.id)) return null;
+    wachtrij.push(z); bewaarRij(); tick();
+    if (inBeeld && inBeeld.id === z.id) return "Inzending staat nu 20 s op het bord";
+    const wachttijd = Math.round(((wachtrij.length - 1) * INZ_DUUR + (inBeeld ? Math.max(0, inBeeld.tot - Date.now()) : 0)) / 1000);
+    return "Inzending in de rij: plek " + wachtrij.length + ", over ca. " + (wachttijd >= 60 ? Math.floor(wachttijd / 60) + " min " + (wachttijd % 60) + " s" : wachttijd + " s") + " op het bord";
   }
   regel = ruw.replace(/\r/g, "").replace(/\s*\|\s*/g, "\n").trim();
   const m = regel.match(/^(\S+)\s*([\s\S]*)$/); if (!m) return null;
@@ -222,6 +274,7 @@ function voerUit(regel, live){
   else if (cmd === "STOP") { if (!live) return null; handmatig = null; const t = nu(); MOMENTEN.forEach((mm, i) => { if (t >= mm.getTime() && t < mm.getTime() + TOON_DUUR) gestopt = i; }); a = "Gestopt, timer staat weer in beeld"; }
   else if (cmd === "QR") { staat.qr = !/^(UIT|OFF|0)$/i.test(rest); bewaar(); tekenQR(); a = staat.qr ? "QR-code staat aan" : "QR-code staat uit"; }
   else if (cmd === "OVERSLAAN") { if (!live) return null; inBeeld = null; a = "Inzending weggehaald"; }
+  else if (cmd === "RIJLEEG") { if (!live) return null; wachtrij = []; bewaarRij(); inBeeld = null; a = "Wachtrij leeggemaakt"; }
   else if (cmd === "PING") { if (!live) return null; a = "Scherm actief"; }
   else return null;
   tick();
@@ -230,7 +283,7 @@ function voerUit(regel, live){
 function status(){
   const t = nu(), d = new Date(t), i = MOMENTEN.findIndex(m => m.getTime() > t);
   const wat = inBeeld ? "inzending in beeld" : $("bericht").classList.contains("aan") ? "tekst in beeld" : i === -1 ? "afgelopen" : "aftellen naar " + hhmm(MOMENTEN[i]);
-  return wat + ", klok " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  return wat + " · rij: " + wachtrij.length + " wachtend · klok " + nlTijd(t) + " · " + syncTekst();
 }
 
 /* ============ AFSTANDSBEDIENING via ntfy.sh ============ */
@@ -258,8 +311,8 @@ document.addEventListener("keydown", e => {
   if ($("start").style.display !== "none") return;
   const k = e.key.toLowerCase();
   if (k === "h" || (k === "escape" && $("hulp").classList.contains("aan"))) {
-    const d = new Date(nu());
-    $("hKlok").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("hKlok").textContent = nlTijd(nu()) + " (Nederlandse tijd)";
+    $("hSync").textContent = syncTekst();
     $("hCorr").textContent = staat.correctie ? "(correctie " + staat.correctie / 1000 + " s)" : "";
     $("hVerb").textContent = verbonden ? "verbonden ✓" : "niet verbonden (timer loopt gewoon door)";
     $("hulp").classList.toggle("aan");
@@ -292,6 +345,8 @@ tekenQR();
 tick();
 setInterval(tick, 100);
 verbind();
+synchroniseer();
+setInterval(synchroniseer, 10 * 60 * 1000);   // elke 10 minuten opnieuw controleren
 </script>
 </body>
 </html>

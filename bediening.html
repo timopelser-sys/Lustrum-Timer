@@ -62,6 +62,7 @@ textarea{min-height:58px;resize:vertical}
   <div id="inzendingen"><div class="leeg">Nog geen nieuwe inzendingen.</div></div>
   <div class="rij" style="margin-top:10px">
     <button class="rand" id="overslaan">Haal huidige van bord</button>
+    <button class="rand" id="rijleeg">Wachtrij leeg</button>
     <button class="rand" id="qrAan">QR aan</button>
     <button class="rand" id="qrUit">QR uit</button>
   </div>
@@ -118,11 +119,13 @@ textarea{min-height:58px;resize:vertical}
 "use strict";
 const NTFY = "https://ntfy.sh";
 const INBOX = "lustrum-inzending-yyde755qx0b3";   // waar gasten naartoe sturen (zelfde als inzenden.html)
-const MOMENTEN = [new Date(2026,10,26,21,35), new Date(2026,10,26,22,35), new Date(2026,10,26,23,35), new Date(2026,10,27,0,35), new Date(2026,10,27,1,35)];
+// Nederlandse tijd (CET = UTC+1): 21:35, 22:35, 23:35, 00:35, 01:35
+const MOMENTEN = [20, 21, 22, 23, 24].map(u => new Date(Date.UTC(2026, 10, 26, u, 35)));
 const STANDAARD = ["PROOST!", "PROOST!", "PROOST!", "PROOST!", "PROOST!"];
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, "0");
-const hhmm = d => pad(d.getHours()) + ":" + pad(d.getMinutes());
+const NL = new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", hour: "2-digit", minute: "2-digit", hour12: false });
+const hhmm = d => NL.format(d);
 
 /* ---------- geheime code: uit de link (#code) of eerder opgeslagen ---------- */
 let CODE = decodeURIComponent(location.hash.slice(1)).trim().toLowerCase();
@@ -171,6 +174,7 @@ if (CODE) {
   $("stop").onclick = () => stuur("STOP");
   $("ping").onclick = () => stuur("PING");
   $("overslaan").onclick = () => stuur("OVERSLAAN");
+  $("rijleeg").onclick = () => { if (confirm("Alle geaccepteerde inzendingen die nog wachten van de wachtrij halen?")) stuur("RIJLEEG"); };
   $("qrAan").onclick = () => stuur("QR AAN");
   $("qrUit").onclick = () => stuur("QR UIT");
   document.querySelectorAll("[data-klok]").forEach(b => b.onclick = () => stuur("KLOK " + b.dataset.klok));
@@ -189,8 +193,7 @@ if (CODE) {
       if (z.foto) { const img = document.createElement("img"); img.src = z.foto; img.alt = "Ingestuurde foto"; img.loading = "lazy"; kaart.append(img); }
       if (z.tekst) { const t = document.createElement("div"); t.className = "tekst"; t.textContent = z.tekst; kaart.append(t); }
       const meta = document.createElement("div"); meta.className = "meta";
-      const tm = new Date(z.tijd * 1000);
-      meta.textContent = (z.naam ? z.naam + " · " : "") + pad(tm.getHours()) + ":" + pad(tm.getMinutes());
+      meta.textContent = (z.naam ? z.naam + " · " : "") + "ingestuurd " + hhmm(new Date(z.tijd * 1000));
       const rij = document.createElement("div"); rij.className = "rij";
       const ja = document.createElement("button"); ja.className = "ja"; ja.textContent = "Accepteren";
       const nee = document.createElement("button"); nee.className = "nee"; nee.textContent = "Weigeren";

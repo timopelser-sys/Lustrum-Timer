@@ -97,12 +97,19 @@ $("formulier").addEventListener("submit", async e => {
   const inhoud = JSON.stringify({ naam, tekst });
   try {
     let r;
-    if (fotoBlob) {
-      r = await fetch(NTFY + "/" + INBOX + "?filename=foto.jpg&message=" + encodeURIComponent(inhoud), { method: "PUT", body: fotoBlob });
-    } else {
-      r = await fetch(NTFY + "/" + INBOX, { method: "POST", body: inhoud });
+    // Bij drukte (fout 429) tot 4 keer automatisch opnieuw proberen, met oplopende wachttijd
+    for (let poging = 0; poging < 5; poging++) {
+      if (fotoBlob) {
+        r = await fetch(NTFY + "/" + INBOX + "?filename=foto.jpg&message=" + encodeURIComponent(inhoud), { method: "PUT", body: fotoBlob });
+      } else {
+        r = await fetch(NTFY + "/" + INBOX, { method: "POST", body: inhoud });
+      }
+      if (r.status !== 429 || poging === 4) break;
+      const na = Math.min(30, parseInt(r.headers.get("retry-after") || "0", 10) || (5 + poging * 5)) + Math.random() * 3;
+      $("verstuur").textContent = "Even druk, opnieuw proberen…";
+      await new Promise(ok => setTimeout(ok, na * 1000));
     }
-    if (!r.ok) throw new Error(r.status === 429 ? "Het is even te druk. Probeer het over een minuut opnieuw." : "Versturen lukte niet (fout " + r.status + ").");
+    if (!r.ok) throw new Error(r.status === 429 ? "Het is nu erg druk. Zet je wifi uit (4G/5G gebruiken) en probeer het opnieuw." : "Versturen lukte niet (fout " + r.status + ").");
     try { localStorage.setItem("lustrum-laatst", String(Date.now())); } catch(x) {}
     melding("Ingestuurd! Na goedkeuring verschijnt het 20 seconden op het bord.", "ok");
     $("tekst").value = ""; $("teller").textContent = "0 / 200"; $("foto").value = ""; fotoBlob = null; $("voorbeeld").hidden = true;
