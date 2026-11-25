@@ -4,38 +4,68 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex">
 <title>Lustrum Bediening</title>
 <style>
-:root{--zwart:#000;--kaart:#0d0a12;--rand:#241a33;--paars:#6a1fc2;--paars-licht:#a774ef;--tekst:#eee;--zacht:#8b80a0;--groen:#3ecf6a;--rood:#e5484d}
+:root{--zwart:#000;--kaart:#0d0a12;--rand:#241a33;--paars:#6a1fc2;--paars-licht:#a774ef;--tekst:#eee;--zacht:#8b80a0;--groen:#2fa95a;--groen-licht:#3ecf6a;--rood:#e5484d}
 *{box-sizing:border-box}
 html{background:var(--zwart)}
 body{margin:0 auto;max-width:560px;background:var(--zwart);color:var(--tekst);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
   padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left))}
 h1{font-size:18px;margin:0;color:var(--paars-licht);letter-spacing:.04em}
-.kop{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.kop{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px}
 .status{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--zacht)}
-.punt{width:9px;height:9px;border-radius:50%;background:#555}
-.punt.ok{background:var(--groen)}.punt.fout{background:var(--rood)}
+.punt{width:9px;height:9px;border-radius:50%;background:#555;flex:none}
+.punt.ok{background:var(--groen-licht)}.punt.fout{background:var(--rood)}
 .kaart{background:var(--kaart);border:1px solid var(--rand);border-radius:14px;padding:14px;margin-bottom:12px}
-.kaart h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--zacht);margin:0 0 10px;font-weight:600}
+.kaart h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--zacht);margin:0 0 10px;font-weight:600;display:flex;align-items:center;gap:8px}
+.badge{background:var(--paars);color:#fff;border-radius:99px;padding:1px 8px;font-size:12px;letter-spacing:0}
+.badge:empty{display:none}
 .aftel{font-size:44px;font-weight:800;color:var(--paars-licht);font-variant-numeric:tabular-nums;line-height:1}
 .klein{font-size:13px;color:var(--zacht);margin-top:6px}
 .rij{display:flex;gap:8px;flex-wrap:wrap}
 button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:13px 12px;cursor:pointer;background:var(--paars);color:#fff;flex:1;min-width:0}
 button.rand{background:transparent;border:1px solid var(--rand);color:var(--tekst)}
+button.ja{background:var(--groen)}
+button.nee{background:transparent;border:1px solid var(--rood);color:var(--rood)}
 button:active{transform:scale(.98)}
-button:focus-visible,textarea:focus-visible{outline:2px solid var(--paars-licht);outline-offset:2px}
-textarea{width:100%;font:inherit;font-size:16px;border-radius:10px;border:1px solid var(--rand);background:#000;color:var(--tekst);padding:10px;min-height:58px;resize:vertical}
+button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--paars-licht);outline-offset:2px}
+textarea,input{width:100%;font:inherit;font-size:16px;border-radius:10px;border:1px solid var(--rand);background:#000;color:var(--tekst);padding:10px}
+textarea{min-height:58px;resize:vertical}
 .uur{display:grid;gap:6px;padding:10px 0;border-top:1px solid var(--rand)}
 .uur:first-of-type{border-top:0;padding-top:0}
 .uur label{font-weight:800;color:var(--paars-licht);font-variant-numeric:tabular-nums}
+.inz{border-top:1px solid var(--rand);padding:12px 0;display:grid;gap:8px}
+.inz:first-child{border-top:0;padding-top:0}
+.inz img{width:100%;max-height:340px;object-fit:contain;border-radius:10px;background:#000}
+.inz .tekst{font-size:17px;font-weight:600;white-space:pre-line;overflow-wrap:anywhere}
+.inz .meta{font-size:12px;color:var(--zacht)}
+.leeg{color:var(--zacht);font-size:14px}
 #log{font-size:13px;color:var(--zacht);max-height:200px;overflow:auto}
 #log div{padding:5px 0;border-bottom:1px solid var(--rand)}
-#log .ok{color:var(--groen)}#log .fout{color:var(--rood)}
+#log .ok{color:var(--groen-licht)}#log .fout{color:var(--rood)}
+#codeKaart[hidden],#alles[hidden]{display:none}
 </style>
 </head>
 <body>
 <div class="kop"><h1>LUSTRUM TIMER</h1><div class="status"><span class="punt" id="punt"></span><span id="statustekst">verbinden…</span></div></div>
+
+<div class="kaart" id="codeKaart" hidden>
+  <h2>Geheime code</h2>
+  <div class="klein" style="margin:-4px 0 10px">Vul de code in die je van Claude hebt gekregen. Hij wordt op deze telefoon onthouden.</div>
+  <form id="codeForm" class="rij"><input id="codeInvoer" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:2"><button>Opslaan</button></form>
+</div>
+
+<div id="alles" hidden>
+<div class="kaart">
+  <h2>Inzendingen <span class="badge" id="aantal"></span></h2>
+  <div id="inzendingen"><div class="leeg">Nog geen nieuwe inzendingen.</div></div>
+  <div class="rij" style="margin-top:10px">
+    <button class="rand" id="overslaan">Haal huidige van bord</button>
+    <button class="rand" id="qrAan">QR aan</button>
+    <button class="rand" id="qrUit">QR uit</button>
+  </div>
+</div>
 
 <div class="kaart">
   <h2>Volgende moment</h2>
@@ -80,17 +110,33 @@ textarea{width:100%;font:inherit;font-size:16px;border-radius:10px;border:1px so
 <div class="kaart">
   <h2>Logboek</h2>
   <div id="log"></div>
+  <div class="rij" style="margin-top:10px"><button class="rand" id="andereCode">Andere code invullen</button></div>
+</div>
 </div>
 
 <script>
 "use strict";
-const KANAAL = "asc-avsv-xxxv-ouzmrgufthb6wl";
 const NTFY = "https://ntfy.sh";
+const INBOX = "lustrum-inzending-yyde755qx0b3";   // waar gasten naartoe sturen (zelfde als inzenden.html)
 const MOMENTEN = [new Date(2026,10,26,21,35), new Date(2026,10,26,22,35), new Date(2026,10,26,23,35), new Date(2026,10,27,0,35), new Date(2026,10,27,1,35)];
 const STANDAARD = ["PROOST!", "PROOST!", "PROOST!", "PROOST!", "PROOST!"];
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, "0");
 const hhmm = d => pad(d.getHours()) + ":" + pad(d.getMinutes());
+
+/* ---------- geheime code: uit de link (#code) of eerder opgeslagen ---------- */
+let CODE = decodeURIComponent(location.hash.slice(1)).trim().toLowerCase();
+try { if (CODE) localStorage.setItem("lustrum-code", CODE); else CODE = localStorage.getItem("lustrum-code") || ""; } catch(e) {}
+if (!CODE) { $("codeKaart").hidden = false; }
+$("codeForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const c = $("codeInvoer").value.trim().toLowerCase();
+  if (!c) return;
+  try { localStorage.setItem("lustrum-code", c); } catch(x) {}
+  location.hash = c; location.reload();
+});
+$("andereCode").onclick = () => { try { localStorage.removeItem("lustrum-code"); } catch(x) {} location.hash = ""; location.reload(); };
+const KANAAL = CODE ? "lustrum-" + CODE : "";
 
 function log(t, soort){
   const d = document.createElement("div"), n = new Date();
@@ -99,57 +145,116 @@ function log(t, soort){
   $("log").prepend(d);
 }
 function zetStatus(s, t){ $("punt").className = "punt " + s; $("statustekst").textContent = t; }
-async function stuur(cmd){
+async function stuur(cmd, stil){
   try {
     const r = await fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body: cmd });
     if (!r.ok) throw new Error("fout " + r.status);
-    log("Verstuurd: " + cmd.replace(/\n/g, " | "));
-  } catch(e) { log("Niet verstuurd (" + e.message + "). Heb je internet?", "fout"); }
+    if (!stil) log("Verstuurd: " + cmd.replace(/\n/g, " | ").slice(0, 80));
+    return true;
+  } catch(e) { log("Niet verstuurd (" + e.message + "). Heb je internet?", "fout"); return false; }
 }
 
-MOMENTEN.forEach((m, i) => {
-  const box = document.createElement("div"); box.className = "uur";
-  const l = document.createElement("label"); l.textContent = hhmm(m); l.htmlFor = "uur" + i;
-  const ta = document.createElement("textarea"); ta.id = "uur" + i; ta.value = STANDAARD[i];
-  const b = document.createElement("button"); b.className = "rand"; b.textContent = "Opslaan voor " + hhmm(m);
-  b.onclick = () => stuur("UUR" + (i + 1) + " " + (ta.value.trim() || STANDAARD[i]));
-  box.append(l, ta, b); $("uren").append(box);
-});
-$("toon").onclick = () => { const v = $("mededeling").value.trim(); if (v) stuur("TEKST " + v); };
-$("weg").onclick = () => stuur("WEG");
-$("feest").onclick = () => stuur("FEEST");
-$("stop").onclick = () => stuur("STOP");
-$("ping").onclick = () => stuur("PING");
-document.querySelectorAll("[data-klok]").forEach(b => b.onclick = () => stuur("KLOK " + b.dataset.klok));
+if (CODE) {
+  $("alles").hidden = false;
 
-// Laatste opgeslagen teksten ophalen uit het kanaal + reacties van het scherm tonen
-const start = Date.now();
-try {
-  const bron = new EventSource(NTFY + "/" + encodeURIComponent(KANAAL) + "/sse?since=12h");
-  bron.onopen = () => zetStatus("ok", "verbonden");
-  bron.onerror = () => zetStatus("fout", "geen verbinding");
-  bron.onmessage = e => {
-    let b; try { b = JSON.parse(e.data); } catch(x) { return; }
-    if (b.event !== "message") return;
-    const msg = String(b.message);
-    if (msg.startsWith("✓")) {
-      if (b.time * 1000 > start - 5000) { log("Scherm: " + msg.slice(2), "ok"); $("schermstatus").textContent = "Scherm: " + msg.slice(2); }
-      return;
+  MOMENTEN.forEach((m, i) => {
+    const box = document.createElement("div"); box.className = "uur";
+    const l = document.createElement("label"); l.textContent = hhmm(m); l.htmlFor = "uur" + i;
+    const ta = document.createElement("textarea"); ta.id = "uur" + i; ta.value = STANDAARD[i];
+    const b = document.createElement("button"); b.className = "rand"; b.textContent = "Opslaan voor " + hhmm(m);
+    b.onclick = () => stuur("UUR" + (i + 1) + " " + (ta.value.trim() || STANDAARD[i]));
+    box.append(l, ta, b); $("uren").append(box);
+  });
+  $("toon").onclick = () => { const v = $("mededeling").value.trim(); if (v) stuur("TEKST " + v); };
+  $("weg").onclick = () => stuur("WEG");
+  $("feest").onclick = () => stuur("FEEST");
+  $("stop").onclick = () => stuur("STOP");
+  $("ping").onclick = () => stuur("PING");
+  $("overslaan").onclick = () => stuur("OVERSLAAN");
+  $("qrAan").onclick = () => stuur("QR AAN");
+  $("qrUit").onclick = () => stuur("QR UIT");
+  document.querySelectorAll("[data-klok]").forEach(b => b.onclick = () => stuur("KLOK " + b.dataset.klok));
+
+  /* ---------- inzendingen beoordelen ---------- */
+  const inzendingen = new Map();   // id -> {naam, tekst, foto, tijd}
+  const besloten = new Set();
+  function tekenInzendingen(){
+    const box = $("inzendingen"); box.textContent = "";
+    const open = [...inzendingen.entries()].filter(([id]) => !besloten.has(id)).sort((a, b) => a[1].tijd - b[1].tijd);
+    $("aantal").textContent = open.length || "";
+    document.title = (open.length ? "(" + open.length + ") " : "") + "Lustrum Bediening";
+    if (!open.length) { const d = document.createElement("div"); d.className = "leeg"; d.textContent = "Nog geen nieuwe inzendingen."; box.append(d); return; }
+    for (const [id, z] of open) {
+      const kaart = document.createElement("div"); kaart.className = "inz";
+      if (z.foto) { const img = document.createElement("img"); img.src = z.foto; img.alt = "Ingestuurde foto"; img.loading = "lazy"; kaart.append(img); }
+      if (z.tekst) { const t = document.createElement("div"); t.className = "tekst"; t.textContent = z.tekst; kaart.append(t); }
+      const meta = document.createElement("div"); meta.className = "meta";
+      const tm = new Date(z.tijd * 1000);
+      meta.textContent = (z.naam ? z.naam + " · " : "") + pad(tm.getHours()) + ":" + pad(tm.getMinutes());
+      const rij = document.createElement("div"); rij.className = "rij";
+      const ja = document.createElement("button"); ja.className = "ja"; ja.textContent = "Accepteren";
+      const nee = document.createElement("button"); nee.className = "nee"; nee.textContent = "Weigeren";
+      ja.onclick = async () => {
+        ja.disabled = nee.disabled = true;
+        const ok = await stuur("TOON " + JSON.stringify({ id, naam: z.naam, tekst: z.tekst, foto: z.foto }), true);
+        if (ok) { besloten.add(id); stuur("BESLUIT " + id + " ja", true); log("Geaccepteerd: " + (z.tekst || "foto").slice(0, 40), "ok"); tekenInzendingen(); }
+        else ja.disabled = nee.disabled = false;
+      };
+      nee.onclick = () => { besloten.add(id); stuur("BESLUIT " + id + " nee", true); log("Geweigerd: " + (z.tekst || "foto").slice(0, 40)); tekenInzendingen(); };
+      rij.append(ja, nee);
+      kaart.append(meta, rij);
+      box.append(kaart);
     }
-    const m = msg.match(/^UUR([1-5])\s*([\s\S]*)$/i);
-    if (m) $("uur" + (m[1] - 1)).value = m[2].replace(/\s*\|\s*/g, "\n").trim() || STANDAARD[m[1] - 1];
-    const t = msg.match(/^TEKST\s+([\s\S]+)$/i);
-    if (t) $("mededeling").value = t[1].replace(/\s*\|\s*/g, "\n").trim();
-  };
-} catch(e) { zetStatus("fout", "geen verbinding"); }
+  }
+  try {
+    const inbox = new EventSource(NTFY + "/" + INBOX + "/sse?since=12h");
+    inbox.onmessage = e => {
+      let b; try { b = JSON.parse(e.data); } catch(x) { return; }
+      if (b.event !== "message" || !b.id || inzendingen.has(b.id)) return;
+      let z = {}; try { z = JSON.parse(b.message); } catch(x) { z = { tekst: String(b.message || "") }; }
+      if (typeof z !== "object" || !z) z = {};
+      const foto = b.attachment && /^https:\/\//.test(b.attachment.url) && /^image\//.test(b.attachment.type || "image/") ? b.attachment.url : "";
+      const tekst = String(z.tekst || "").slice(0, 280), naam = String(z.naam || "").slice(0, 40);
+      if (!tekst && !foto) return;
+      inzendingen.set(b.id, { naam, tekst, foto, tijd: b.time });
+      tekenInzendingen();
+      if (b.time * 1000 > Date.now() - 15000 && navigator.vibrate) navigator.vibrate(150);
+    };
+  } catch(e) {}
 
-setInterval(() => {
-  const t = Date.now(), i = MOMENTEN.findIndex(m => m.getTime() > t);
-  if (i === -1) { $("aftel").textContent = "00:00"; $("aftelwat").textContent = "Alle momenten zijn geweest."; return; }
-  const s = Math.ceil((MOMENTEN[i] - t) / 1000), u = Math.floor(s / 3600);
-  $("aftel").textContent = (u ? u + ":" : "") + pad(Math.floor(s % 3600 / 60)) + ":" + pad(s % 60);
-  $("aftelwat").textContent = "tot " + hhmm(MOMENTEN[i]) + " · moment " + (i + 1) + " van 5 (klok telefoon)";
-}, 250);
+  /* ---------- eigen kanaal: teksten, besluiten en reacties van het scherm ---------- */
+  const start = Date.now();
+  try {
+    const bron = new EventSource(NTFY + "/" + encodeURIComponent(KANAAL) + "/sse?since=12h");
+    bron.onopen = () => zetStatus("ok", "verbonden");
+    bron.onerror = () => zetStatus("fout", "geen verbinding");
+    bron.onmessage = e => {
+      let b; try { b = JSON.parse(e.data); } catch(x) { return; }
+      if (b.event !== "message") return;
+      const msg = String(b.message);
+      if (msg.startsWith("✓")) {
+        if (b.time * 1000 > start - 5000) { log("Scherm: " + msg.slice(2), "ok"); $("schermstatus").textContent = "Scherm: " + msg.slice(2); }
+        return;
+      }
+      const bes = msg.match(/^BESLUIT\s+(\S+)/);
+      if (bes) { besloten.add(bes[1]); tekenInzendingen(); return; }
+      const m = msg.match(/^UUR([1-5])\s*([\s\S]*)$/i);
+      if (m) $("uur" + (m[1] - 1)).value = m[2].replace(/\s*\|\s*/g, "\n").trim() || STANDAARD[m[1] - 1];
+      const t = msg.match(/^TEKST\s+([\s\S]+)$/i);
+      if (t) $("mededeling").value = t[1].replace(/\s*\|\s*/g, "\n").trim();
+    };
+  } catch(e) { zetStatus("fout", "geen verbinding"); }
+
+  setInterval(() => {
+    const t = Date.now(), i = MOMENTEN.findIndex(m => m.getTime() > t);
+    if (i === -1) { $("aftel").textContent = "00:00"; $("aftelwat").textContent = "Alle momenten zijn geweest."; return; }
+    const s = Math.ceil((MOMENTEN[i] - t) / 1000), u = Math.floor(s / 3600);
+    $("aftel").textContent = (u ? u + ":" : "") + pad(Math.floor(s % 3600 / 60)) + ":" + pad(s % 60);
+    $("aftelwat").textContent = "tot " + hhmm(MOMENTEN[i]) + " · moment " + (i + 1) + " van 5 (klok telefoon)";
+  }, 250);
+} else {
+  zetStatus("", "geen code");
+}
 </script>
 </body>
 </html>

@@ -33,6 +33,22 @@ body{color:var(--tekst);font-family:"Segoe UI",system-ui,-apple-system,Arial,san
 #hulp.aan{display:block}
 #hulp h2{color:var(--tekst);margin-bottom:1vh}
 #hulp kbd{background:#222;border-radius:.5vh;padding:.1vh .7vw;font-family:inherit;color:#fff}
+#qr{position:fixed;right:2.5vw;bottom:3vh;display:flex;flex-direction:column;align-items:center;gap:1vh;z-index:10}
+#qr .bijschrift{color:var(--tekst);font-weight:800;font-size:1.6vw;letter-spacing:.04em;text-align:center}
+#qr svg{width:17vh;height:17vh;display:block;border-radius:.8vh}
+body.zonderQR #qr, body.inBericht #qr{display:none}
+#inzending{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:3vh;padding:17vh 6vw 4vh}
+#inzending.aan{display:flex}
+#inzFoto{max-width:70vw;max-height:52vh;border-radius:1.2vh;object-fit:contain;box-shadow:0 0 4vh var(--gloed)}
+#inzFoto[hidden]{display:none}
+#inzTekst{color:#fff;font-size:4.2vw;font-weight:700;text-align:center;line-height:1.15;max-width:80vw;white-space:pre-line}
+#inzTekst.alleenTekst{font-size:6.5vw}
+#inzNaam{color:var(--tekst);font-size:2vw;font-weight:700;letter-spacing:.05em}
+#inzNaam:empty,#inzTekst:empty{display:none}
+#kleineTimer{position:fixed;top:3vh;left:50%;transform:translateX(-50%);width:22vw}
+#kleineTimer svg{width:100%;height:auto;display:block;overflow:visible}
+#kleineTimer .aan{fill:var(--aan);filter:drop-shadow(0 0 .4vw var(--gloed))}
+#kleineTimer .uit{fill:var(--uit)}
 #testlabel{position:fixed;top:1vh;left:1vw;color:#a33;font-weight:800;font-size:1.2vw;display:none;z-index:60}
 </style>
 </head>
@@ -42,11 +58,14 @@ body{color:var(--tekst);font-family:"Segoe UI",system-ui,-apple-system,Arial,san
 
 <div id="timer"><div id="cijfers"></div><div id="mededeling"></div></div>
 <div id="bericht"><div id="berichtTekst"></div></div>
+<div id="inzending"><div id="kleineTimer"></div><img id="inzFoto" alt="" hidden><div id="inzTekst"></div><div id="inzNaam"></div></div>
+<div id="qr"><div class="bijschrift">Voeg toe aan het bord</div><svg viewBox="-2 -2 37 37" shape-rendering="crispEdges"><rect x="-2" y="-2" width="37" height="37" fill="#fff"/><path d="M0 0h1v1h-1zM1 0h1v1h-1zM2 0h1v1h-1zM3 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM6 0h1v1h-1zM8 0h1v1h-1zM9 0h1v1h-1zM12 0h1v1h-1zM13 0h1v1h-1zM19 0h1v1h-1zM20 0h1v1h-1zM21 0h1v1h-1zM23 0h1v1h-1zM26 0h1v1h-1zM27 0h1v1h-1zM28 0h1v1h-1zM29 0h1v1h-1zM30 0h1v1h-1zM31 0h1v1h-1zM32 0h1v1h-1zM0 1h1v1h-1zM6 1h1v1h-1zM8 1h1v1h-1zM11 1h1v1h-1zM12 1h1v1h-1zM13 1h1v1h-1zM17 1h1v1h-1zM18 1h1v1h-1zM22 1h1v1h-1zM23 1h1v1h-1zM26 1h1v1h-1zM32 1h1v1h-1zM0 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM6 2h1v1h-1zM9 2h1v1h-1zM15 2h1v1h-1zM16 2h1v1h-1zM19 2h1v1h-1zM26 2h1v1h-1zM28 2h1v1h-1zM29 2h1v1h-1zM30 2h1v1h-1zM32 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM6 3h1v1h-1zM8 3h1v1h-1zM9 3h1v1h-1zM10 3h1v1h-1zM11 3h1v1h-1zM14 3h1v1h-1zM15 3h1v1h-1zM17 3h1v1h-1zM19 3h1v1h-1zM22 3h1v1h-1zM24 3h1v1h-1zM26 3h1v1h-1zM28 3h1v1h-1zM29 3h1v1h-1zM30 3h1v1h-1zM32 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM6 4h1v1h-1zM10 4h1v1h-1zM12 4h1v1h-1zM13 4h1v1h-1zM14 4h1v1h-1zM17 4h1v1h-1zM19 4h1v1h-1zM22 4h1v1h-1zM24 4h1v1h-1zM26 4h1v1h-1zM28 4h1v1h-1zM29 4h1v1h-1zM30 4h1v1h-1zM32 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM9 5h1v1h-1zM11 5h1v1h-1zM12 5h1v1h-1zM14 5h1v1h-1zM16 5h1v1h-1zM17 5h1v1h-1zM19 5h1v1h-1zM24 5h1v1h-1zM26 5h1v1h-1zM32 5h1v1h-1zM0 6h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h1v1h-1zM27 6h1v1h-1zM28 6h1v1h-1zM29 6h1v1h-1zM30 6h1v1h-1zM31 6h1v1h-1zM32 6h1v1h-1zM8 7h1v1h-1zM9 7h1v1h-1zM11 7h1v1h-1zM12 7h1v1h-1zM14 7h1v1h-1zM16 7h1v1h-1zM17 7h1v1h-1zM18 7h1v1h-1zM19 7h1v1h-1zM22 7h1v1h-1zM23 7h1v1h-1zM24 7h1v1h-1zM0 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM9 8h1v1h-1zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM15 8h1v1h-1zM16 8h1v1h-1zM17 8h1v1h-1zM20 8h1v1h-1zM21 8h1v1h-1zM23 8h1v1h-1zM24 8h1v1h-1zM26 8h1v1h-1zM29 8h1v1h-1zM31 8h1v1h-1zM32 8h1v1h-1zM0 9h1v1h-1zM1 9h1v1h-1zM2 9h1v1h-1zM4 9h1v1h-1zM5 9h1v1h-1zM7 9h1v1h-1zM8 9h1v1h-1zM11 9h1v1h-1zM16 9h1v1h-1zM18 9h1v1h-1zM19 9h1v1h-1zM20 9h1v1h-1zM21 9h1v1h-1zM23 9h1v1h-1zM26 9h1v1h-1zM27 9h1v1h-1zM29 9h1v1h-1zM30 9h1v1h-1zM2 10h1v1h-1zM4 10h1v1h-1zM5 10h1v1h-1zM6 10h1v1h-1zM8 10h1v1h-1zM10 10h1v1h-1zM12 10h1v1h-1zM14 10h1v1h-1zM16 10h1v1h-1zM17 10h1v1h-1zM18 10h1v1h-1zM21 10h1v1h-1zM23 10h1v1h-1zM24 10h1v1h-1zM25 10h1v1h-1zM26 10h1v1h-1zM27 10h1v1h-1zM28 10h1v1h-1zM29 10h1v1h-1zM31 10h1v1h-1zM32 10h1v1h-1zM0 11h1v1h-1zM1 11h1v1h-1zM2 11h1v1h-1zM3 11h1v1h-1zM10 11h1v1h-1zM11 11h1v1h-1zM12 11h1v1h-1zM13 11h1v1h-1zM14 11h1v1h-1zM18 11h1v1h-1zM22 11h1v1h-1zM23 11h1v1h-1zM24 11h1v1h-1zM27 11h1v1h-1zM29 11h1v1h-1zM32 11h1v1h-1zM1 12h1v1h-1zM2 12h1v1h-1zM3 12h1v1h-1zM6 12h1v1h-1zM7 12h1v1h-1zM10 12h1v1h-1zM15 12h1v1h-1zM17 12h1v1h-1zM23 12h1v1h-1zM24 12h1v1h-1zM25 12h1v1h-1zM28 12h1v1h-1zM29 12h1v1h-1zM31 12h1v1h-1zM32 12h1v1h-1zM4 13h1v1h-1zM7 13h1v1h-1zM9 13h1v1h-1zM10 13h1v1h-1zM12 13h1v1h-1zM13 13h1v1h-1zM15 13h1v1h-1zM16 13h1v1h-1zM19 13h1v1h-1zM21 13h1v1h-1zM24 13h1v1h-1zM27 13h1v1h-1zM30 13h1v1h-1zM31 13h1v1h-1zM2 14h1v1h-1zM3 14h1v1h-1zM4 14h1v1h-1zM6 14h1v1h-1zM8 14h1v1h-1zM9 14h1v1h-1zM10 14h1v1h-1zM11 14h1v1h-1zM13 14h1v1h-1zM14 14h1v1h-1zM17 14h1v1h-1zM18 14h1v1h-1zM19 14h1v1h-1zM20 14h1v1h-1zM24 14h1v1h-1zM26 14h1v1h-1zM0 15h1v1h-1zM1 15h1v1h-1zM2 15h1v1h-1zM4 15h1v1h-1zM10 15h1v1h-1zM11 15h1v1h-1zM14 15h1v1h-1zM15 15h1v1h-1zM16 15h1v1h-1zM18 15h1v1h-1zM20 15h1v1h-1zM21 15h1v1h-1zM24 15h1v1h-1zM25 15h1v1h-1zM26 15h1v1h-1zM27 15h1v1h-1zM29 15h1v1h-1zM30 15h1v1h-1zM0 16h1v1h-1zM1 16h1v1h-1zM2 16h1v1h-1zM3 16h1v1h-1zM5 16h1v1h-1zM6 16h1v1h-1zM7 16h1v1h-1zM8 16h1v1h-1zM11 16h1v1h-1zM12 16h1v1h-1zM14 16h1v1h-1zM15 16h1v1h-1zM16 16h1v1h-1zM18 16h1v1h-1zM21 16h1v1h-1zM22 16h1v1h-1zM25 16h1v1h-1zM26 16h1v1h-1zM28 16h1v1h-1zM30 16h1v1h-1zM0 17h1v1h-1zM5 17h1v1h-1zM9 17h1v1h-1zM11 17h1v1h-1zM13 17h1v1h-1zM14 17h1v1h-1zM15 17h1v1h-1zM17 17h1v1h-1zM20 17h1v1h-1zM21 17h1v1h-1zM23 17h1v1h-1zM24 17h1v1h-1zM26 17h1v1h-1zM28 17h1v1h-1zM29 17h1v1h-1zM31 17h1v1h-1zM32 17h1v1h-1zM2 18h1v1h-1zM3 18h1v1h-1zM4 18h1v1h-1zM5 18h1v1h-1zM6 18h1v1h-1zM8 18h1v1h-1zM9 18h1v1h-1zM10 18h1v1h-1zM15 18h1v1h-1zM17 18h1v1h-1zM20 18h1v1h-1zM22 18h1v1h-1zM25 18h1v1h-1zM26 18h1v1h-1zM27 18h1v1h-1zM28 18h1v1h-1zM30 18h1v1h-1zM1 19h1v1h-1zM4 19h1v1h-1zM5 19h1v1h-1zM8 19h1v1h-1zM10 19h1v1h-1zM11 19h1v1h-1zM13 19h1v1h-1zM17 19h1v1h-1zM22 19h1v1h-1zM23 19h1v1h-1zM24 19h1v1h-1zM25 19h1v1h-1zM26 19h1v1h-1zM28 19h1v1h-1zM31 19h1v1h-1zM3 20h1v1h-1zM4 20h1v1h-1zM5 20h1v1h-1zM6 20h1v1h-1zM7 20h1v1h-1zM8 20h1v1h-1zM9 20h1v1h-1zM11 20h1v1h-1zM12 20h1v1h-1zM13 20h1v1h-1zM15 20h1v1h-1zM16 20h1v1h-1zM17 20h1v1h-1zM21 20h1v1h-1zM23 20h1v1h-1zM25 20h1v1h-1zM27 20h1v1h-1zM29 20h1v1h-1zM30 20h1v1h-1zM32 20h1v1h-1zM0 21h1v1h-1zM2 21h1v1h-1zM9 21h1v1h-1zM10 21h1v1h-1zM13 21h1v1h-1zM14 21h1v1h-1zM16 21h1v1h-1zM18 21h1v1h-1zM19 21h1v1h-1zM20 21h1v1h-1zM21 21h1v1h-1zM23 21h1v1h-1zM26 21h1v1h-1zM29 21h1v1h-1zM30 21h1v1h-1zM32 21h1v1h-1zM4 22h1v1h-1zM5 22h1v1h-1zM6 22h1v1h-1zM9 22h1v1h-1zM10 22h1v1h-1zM13 22h1v1h-1zM18 22h1v1h-1zM20 22h1v1h-1zM21 22h1v1h-1zM23 22h1v1h-1zM25 22h1v1h-1zM26 22h1v1h-1zM31 22h1v1h-1zM32 22h1v1h-1zM1 23h1v1h-1zM3 23h1v1h-1zM4 23h1v1h-1zM7 23h1v1h-1zM12 23h1v1h-1zM13 23h1v1h-1zM14 23h1v1h-1zM18 23h1v1h-1zM24 23h1v1h-1zM25 23h1v1h-1zM27 23h1v1h-1zM28 23h1v1h-1zM29 23h1v1h-1zM31 23h1v1h-1zM0 24h1v1h-1zM2 24h1v1h-1zM3 24h1v1h-1zM4 24h1v1h-1zM6 24h1v1h-1zM7 24h1v1h-1zM8 24h1v1h-1zM9 24h1v1h-1zM10 24h1v1h-1zM11 24h1v1h-1zM14 24h1v1h-1zM15 24h1v1h-1zM17 24h1v1h-1zM19 24h1v1h-1zM22 24h1v1h-1zM24 24h1v1h-1zM25 24h1v1h-1zM26 24h1v1h-1zM27 24h1v1h-1zM28 24h1v1h-1zM29 24h1v1h-1zM31 24h1v1h-1zM32 24h1v1h-1zM8 25h1v1h-1zM9 25h1v1h-1zM11 25h1v1h-1zM13 25h1v1h-1zM15 25h1v1h-1zM16 25h1v1h-1zM19 25h1v1h-1zM20 25h1v1h-1zM21 25h1v1h-1zM23 25h1v1h-1zM24 25h1v1h-1zM28 25h1v1h-1zM29 25h1v1h-1zM0 26h1v1h-1zM1 26h1v1h-1zM2 26h1v1h-1zM3 26h1v1h-1zM4 26h1v1h-1zM5 26h1v1h-1zM6 26h1v1h-1zM8 26h1v1h-1zM10 26h1v1h-1zM11 26h1v1h-1zM16 26h1v1h-1zM17 26h1v1h-1zM18 26h1v1h-1zM19 26h1v1h-1zM22 26h1v1h-1zM23 26h1v1h-1zM24 26h1v1h-1zM26 26h1v1h-1zM28 26h1v1h-1zM0 27h1v1h-1zM6 27h1v1h-1zM8 27h1v1h-1zM9 27h1v1h-1zM11 27h1v1h-1zM12 27h1v1h-1zM13 27h1v1h-1zM14 27h1v1h-1zM15 27h1v1h-1zM16 27h1v1h-1zM18 27h1v1h-1zM19 27h1v1h-1zM21 27h1v1h-1zM22 27h1v1h-1zM23 27h1v1h-1zM24 27h1v1h-1zM28 27h1v1h-1zM29 27h1v1h-1zM30 27h1v1h-1zM31 27h1v1h-1zM0 28h1v1h-1zM2 28h1v1h-1zM3 28h1v1h-1zM4 28h1v1h-1zM6 28h1v1h-1zM10 28h1v1h-1zM11 28h1v1h-1zM12 28h1v1h-1zM14 28h1v1h-1zM16 28h1v1h-1zM18 28h1v1h-1zM21 28h1v1h-1zM22 28h1v1h-1zM23 28h1v1h-1zM24 28h1v1h-1zM25 28h1v1h-1zM26 28h1v1h-1zM27 28h1v1h-1zM28 28h1v1h-1zM30 28h1v1h-1zM0 29h1v1h-1zM2 29h1v1h-1zM3 29h1v1h-1zM4 29h1v1h-1zM6 29h1v1h-1zM8 29h1v1h-1zM10 29h1v1h-1zM11 29h1v1h-1zM14 29h1v1h-1zM15 29h1v1h-1zM17 29h1v1h-1zM20 29h1v1h-1zM22 29h1v1h-1zM23 29h1v1h-1zM27 29h1v1h-1zM32 29h1v1h-1zM0 30h1v1h-1zM2 30h1v1h-1zM3 30h1v1h-1zM4 30h1v1h-1zM6 30h1v1h-1zM8 30h1v1h-1zM9 30h1v1h-1zM10 30h1v1h-1zM11 30h1v1h-1zM12 30h1v1h-1zM13 30h1v1h-1zM15 30h1v1h-1zM18 30h1v1h-1zM21 30h1v1h-1zM22 30h1v1h-1zM26 30h1v1h-1zM27 30h1v1h-1zM29 30h1v1h-1zM0 31h1v1h-1zM6 31h1v1h-1zM9 31h1v1h-1zM11 31h1v1h-1zM12 31h1v1h-1zM13 31h1v1h-1zM17 31h1v1h-1zM18 31h1v1h-1zM19 31h1v1h-1zM22 31h1v1h-1zM25 31h1v1h-1zM27 31h1v1h-1zM28 31h1v1h-1zM32 31h1v1h-1zM0 32h1v1h-1zM1 32h1v1h-1zM2 32h1v1h-1zM3 32h1v1h-1zM4 32h1v1h-1zM5 32h1v1h-1zM6 32h1v1h-1zM8 32h1v1h-1zM9 32h1v1h-1zM10 32h1v1h-1zM12 32h1v1h-1zM14 32h1v1h-1zM15 32h1v1h-1zM17 32h1v1h-1zM18 32h1v1h-1zM20 32h1v1h-1zM21 32h1v1h-1zM23 32h1v1h-1zM28 32h1v1h-1zM29 32h1v1h-1zM30 32h1v1h-1z" fill="#000"/></svg></div>
 
 <div id="hulp">
   <h2>Lustrum Timer</h2>
   <kbd>F</kbd> tekst van het uur nu tonen (1 min) · <kbd>S</kbd> stoppen ·
   <kbd>T</kbd> tekst onder timer · <kbd>W</kbd> tekst weg<br>
+  <kbd>Q</kbd> QR-code aan/uit · <kbd>N</kbd> inzending van het bord halen<br>
   <kbd>+</kbd>/<kbd>-</kbd> klok ±1 s · <kbd>0</kbd> correctie op 0 · <kbd>V</kbd> volledig scherm · <kbd>H</kbd> sluiten<br><br>
   Klok laptop: <span id="hKlok"></span> <span id="hCorr"></span><br>
   Afstandsbediening: <span id="hVerb"></span><br>
@@ -57,7 +76,9 @@ body{color:var(--tekst);font-family:"Segoe UI",system-ui,-apple-system,Arial,san
 <script>
 "use strict";
 /* ============ INSTELLINGEN ============ */
-const KANAAL = "asc-avsv-xxxv-ouzmrgufthb6wl";   // zelfde als in bediening.html
+// Geheime code staat NIET in de code, maar achter # in de link: index.html#jouwcode
+const CODE = decodeURIComponent(location.hash.slice(1)).trim().toLowerCase();
+const KANAAL = CODE ? "lustrum-" + CODE : "";
 const NTFY = "https://ntfy.sh";
 let MOMENTEN = [   // lokale tijd laptop; maand 10 = november
   new Date(2026, 10, 26, 21, 35, 0),
@@ -67,6 +88,8 @@ let MOMENTEN = [   // lokale tijd laptop; maand 10 = november
   new Date(2026, 10, 27,  1, 35, 0),
 ];
 const TOON_DUUR = 60 * 1000;   // tekst van het uur 1 minuut in beeld
+const INZ_DUUR = 20 * 1000;    // goedgekeurde inzending 20 seconden in beeld
+const INZ_VRIJ = 30 * 1000;    // geen inzendingen in de laatste 30 s voor een moment
 const STANDAARD = ["PROOST!", "PROOST!", "PROOST!", "PROOST!", "PROOST!"];
 
 const P = new URLSearchParams(location.search);
@@ -79,7 +102,7 @@ if (TEST) {   // ?test → elke 2 minuten een moment, eerste binnen ~1 minuut
 
 /* ============ TOESTAND ============ */
 const SLEUTEL = "lustrumtimer2-" + KANAAL + (TEST ? "-test" : "");
-let staat = { teksten: STANDAARD.slice(), mededeling: "", correctie: 0 };
+let staat = { teksten: STANDAARD.slice(), mededeling: "", correctie: 0, qr: true };
 try { const s = JSON.parse(localStorage.getItem(SLEUTEL)); if (s) Object.assign(staat, s); } catch(e) {}
 const bewaar = () => { try { localStorage.setItem(SLEUTEL, JSON.stringify(staat)); } catch(e) {} };
 let handmatig = null, gestopt = -1;
@@ -94,10 +117,10 @@ const V = (cx, y1, y2) => `${cx},${y1} ${cx+6},${y1+6} ${cx+6},${y2-6} ${cx},${y
 const SEG = { a:H(6), g:H(50), d:H(94), b:V(54,8,48), c:V(54,52,92), f:V(6,8,48), e:V(6,52,92) };
 const CIJFER = { "0":"abcdef","1":"bc","2":"abged","3":"abgcd","4":"fgbc","5":"afgcd","6":"afgedc","7":"abc","8":"abcdefg","9":"abcdfg" };
 const DW = 60, GAP = 14, CW = 22;
-let vorigeTekst = "";
-function tekenCijfers(tekst){
-  if (tekst === vorigeTekst) return;
-  vorigeTekst = tekst;
+const vorige = {};
+function tekenCijfers(tekst, doel = "cijfers"){
+  if (vorige[doel] === tekst) return;
+  vorige[doel] = tekst;
   let x = 0, delen = [];
   for (const ch of tekst) {
     if (ch === ":") {
@@ -110,7 +133,7 @@ function tekenCijfers(tekst){
     }
   }
   const breed = x - GAP;
-  $("cijfers").innerHTML = `<svg viewBox="-6 -2 ${breed+12} 104" preserveAspectRatio="xMidYMid meet"><g transform="skewX(-5) translate(5,0)">${delen.join("")}</g></svg>`;
+  $(doel).innerHTML = `<svg viewBox="-6 -2 ${breed+12} 104" preserveAspectRatio="xMidYMid meet"><g transform="skewX(-5) translate(5,0)">${delen.join("")}</g></svg>`;
 }
 
 /* ============ WEERGAVE ============ */
@@ -127,7 +150,9 @@ function toon(wat, index){
   huidig = sleutel;
   if (wat === "bericht") zetBericht(staat.teksten[index] || "PROOST!");
   $("bericht").classList.toggle("aan", wat === "bericht");
-  $("timer").classList.toggle("weg", wat === "bericht");
+  $("inzending").classList.toggle("aan", wat === "inzending");
+  $("timer").classList.toggle("weg", wat !== "timer");
+  document.body.classList.toggle("inBericht", wat === "bericht");
 }
 function tick(){
   const t = nu();
@@ -137,20 +162,51 @@ function tick(){
     const m = MOMENTEN[i].getTime();
     if (t >= m && t < m + TOON_DUUR && gestopt !== i) return toon("bericht", i);
   }
-  toon("timer", 0);
   const i = MOMENTEN.findIndex(m => m.getTime() > t);
-  if (i === -1) { tekenCijfers("00:00"); return; }   // na 01:35 blijft 00:00 staan
-  const sec = Math.ceil((MOMENTEN[i].getTime() - t) / 1000);   // precies op het moment: 0
-  const u = Math.floor(sec / 3600), mi = Math.floor(sec % 3600 / 60), s = sec % 60;
-  tekenCijfers(u > 0 ? u + ":" + pad(mi) + ":" + pad(s) : pad(mi) + ":" + pad(s));
+  let tijd = "00:00", totMoment = Infinity;   // na 01:35 blijft 00:00 staan
+  if (i !== -1) {
+    totMoment = MOMENTEN[i].getTime() - t;
+    const sec = Math.ceil(totMoment / 1000);   // precies op het moment: 0
+    const u = Math.floor(sec / 3600), mi = Math.floor(sec % 3600 / 60), s = sec % 60;
+    tijd = u > 0 ? u + ":" + pad(mi) + ":" + pad(s) : pad(mi) + ":" + pad(s);
+  }
+  // Inzending in beeld? Stopt altijd uiterlijk 30 s voor een moment.
+  if (inBeeld && (Date.now() >= inBeeld.tot || totMoment <= INZ_VRIJ)) inBeeld = null;
+  if (!inBeeld && wachtrij.length && totMoment > INZ_VRIJ + 5000) {
+    inBeeld = Object.assign(wachtrij.shift(), { tot: Date.now() + INZ_DUUR });
+    zetInzending(inBeeld);
+  }
+  if (inBeeld) { toon("inzending", inBeeld.id); tekenCijfers(tijd, "kleineTimer"); return; }
+  toon("timer", 0);
+  tekenCijfers(tijd);
 }
+/* ============ INZENDINGEN VAN GASTEN ============ */
+let wachtrij = [], inBeeld = null;
+function zetInzending(z){
+  const f = $("inzFoto");
+  if (z.foto && /^https:\/\//.test(z.foto)) { f.src = z.foto; f.hidden = false; } else { f.removeAttribute("src"); f.hidden = true; }
+  $("inzTekst").textContent = z.tekst || "";
+  $("inzTekst").classList.toggle("alleenTekst", !z.foto);
+  $("inzNaam").textContent = z.naam ? "— " + z.naam : "";
+}
+function tekenQR(){ document.body.classList.toggle("zonderQR", !staat.qr); }
 function tekenMededeling(){ $("mededeling").textContent = staat.mededeling || ""; }
 
 /* ============ COMMANDO'S ============ */
 // FEEST [n] · STOP · TEKST ... · WEG · UUR1..UUR5 ... ("|" = nieuwe regel) · KLOK +n/-n/0 · PING
 function laatsteIndex(){ const t = nu(); let x = 0; MOMENTEN.forEach((m, i) => { if (m.getTime() <= t) x = i; }); return x; }
 function voerUit(regel, live){
-  regel = String(regel || "").replace(/\r/g, "").replace(/\s*\|\s*/g, "\n").trim();
+  const ruw = String(regel || "").trim();
+  if (/^TOON\s/i.test(ruw)) {   // goedgekeurde inzending: TOON {"id","naam","tekst","foto"}
+    if (!live) return null;
+    let z; try { z = JSON.parse(ruw.slice(5)); } catch(e) { return null; }
+    if (!z || (!z.tekst && !z.foto)) return null;
+    z = { id: String(z.id || Math.random()), naam: String(z.naam || "").slice(0, 40), tekst: String(z.tekst || "").slice(0, 280), foto: String(z.foto || "") };
+    if (z.foto && !/^https:\/\//.test(z.foto)) z.foto = "";
+    wachtrij.push(z); tick();
+    return inBeeld && inBeeld.id === z.id ? "Inzending staat nu 20 s op het bord" : "Inzending in de rij (plek " + (wachtrij.length) + ")";
+  }
+  regel = ruw.replace(/\r/g, "").replace(/\s*\|\s*/g, "\n").trim();
   const m = regel.match(/^(\S+)\s*([\s\S]*)$/); if (!m) return null;
   const cmd = m[1].toUpperCase(), rest = m[2].trim();
   let a = null;
@@ -164,6 +220,8 @@ function voerUit(regel, live){
   }
   else if (cmd === "FEEST") { if (!live) return null; let i = parseInt(rest, 10); i = i >= 1 && i <= 5 ? i - 1 : laatsteIndex(); handmatig = { tot: nu() + TOON_DUUR, index: i }; gestopt = -1; a = "Tekst van " + hhmm(MOMENTEN[i]) + " staat in beeld"; }
   else if (cmd === "STOP") { if (!live) return null; handmatig = null; const t = nu(); MOMENTEN.forEach((mm, i) => { if (t >= mm.getTime() && t < mm.getTime() + TOON_DUUR) gestopt = i; }); a = "Gestopt, timer staat weer in beeld"; }
+  else if (cmd === "QR") { staat.qr = !/^(UIT|OFF|0)$/i.test(rest); bewaar(); tekenQR(); a = staat.qr ? "QR-code staat aan" : "QR-code staat uit"; }
+  else if (cmd === "OVERSLAAN") { if (!live) return null; inBeeld = null; a = "Inzending weggehaald"; }
   else if (cmd === "PING") { if (!live) return null; a = "Scherm actief"; }
   else return null;
   tick();
@@ -171,7 +229,7 @@ function voerUit(regel, live){
 }
 function status(){
   const t = nu(), d = new Date(t), i = MOMENTEN.findIndex(m => m.getTime() > t);
-  const wat = $("bericht").classList.contains("aan") ? "tekst in beeld" : i === -1 ? "afgelopen" : "aftellen naar " + hhmm(MOMENTEN[i]);
+  const wat = inBeeld ? "inzending in beeld" : $("bericht").classList.contains("aan") ? "tekst in beeld" : i === -1 ? "afgelopen" : "aftellen naar " + hhmm(MOMENTEN[i]);
   return wat + ", klok " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
 }
 
@@ -179,7 +237,7 @@ function status(){
 const geladen = Date.now(), gezien = new Set();
 let verbonden = false;
 function verbind(){
-  if (P.has("offline")) return;
+  if (P.has("offline") || !KANAAL) return;
   try {
     const bron = new EventSource(NTFY + "/" + encodeURIComponent(KANAAL) + "/sse?since=12h");
     bron.onopen = () => verbonden = true;
@@ -215,6 +273,8 @@ document.addEventListener("keydown", e => {
   else if (k === "+" || k === "=") voerUit("KLOK +1", true);
   else if (k === "-") voerUit("KLOK -1", true);
   else if (k === "0") voerUit("KLOK 0", true);
+  else if (k === "q") voerUit(staat.qr ? "QR UIT" : "QR AAN", true);
+  else if (k === "n") voerUit("OVERSLAAN", true);
   else if (k === "v") { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch(x) {} }
 });
 async function wakker(){ try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch(e) {} }
@@ -226,8 +286,9 @@ $("start").addEventListener("click", () => {
 });
 
 $("hTijden").textContent = MOMENTEN.map(hhmm).join(", ");
-$("hKanaal").textContent = KANAAL;
+$("hKanaal").textContent = KANAAL ? "geheime code ingesteld ✓" : "GEEN code in de link (#code ontbreekt), bediening werkt niet";
 tekenMededeling();
+tekenQR();
 tick();
 setInterval(tick, 100);
 verbind();

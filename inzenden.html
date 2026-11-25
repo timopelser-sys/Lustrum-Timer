@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Voeg toe aan het bord</title>
+<style>
+:root{--zwart:#000;--kaart:#0d0a12;--rand:#241a33;--paars:#6a1fc2;--paars-licht:#a774ef;--tekst:#eee;--zacht:#8b80a0;--groen:#3ecf6a;--rood:#e5484d}
+*{box-sizing:border-box}
+html{background:var(--zwart)}
+body{margin:0 auto;max-width:520px;background:var(--zwart);color:var(--tekst);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left))}
+h1{font-size:26px;margin:8px 0 4px;color:var(--paars-licht);text-wrap:balance}
+.sub{color:var(--zacht);font-size:14px;margin:0 0 20px}
+form{display:grid;gap:16px}
+label{display:grid;gap:6px;font-weight:700;font-size:14px}
+label span{color:var(--zacht);font-weight:400}
+input[type=text],textarea{width:100%;font:inherit;font-size:16px;border-radius:12px;border:1px solid var(--rand);background:var(--kaart);color:var(--tekst);padding:12px}
+textarea{min-height:90px;resize:vertical}
+.foto{border:1px dashed var(--rand);border-radius:12px;padding:16px;text-align:center;background:var(--kaart);cursor:pointer;color:var(--zacht)}
+.foto input{display:none}
+#voorbeeld{max-width:100%;max-height:260px;border-radius:10px;margin-top:10px}
+#voorbeeld[hidden]{display:none}
+button{font:inherit;font-weight:800;font-size:17px;border:0;border-radius:12px;padding:15px;background:var(--paars);color:#fff;cursor:pointer}
+button:disabled{opacity:.5}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--paars-licht);outline-offset:2px}
+.teller{font-size:12px;color:var(--zacht);text-align:right;margin-top:-10px}
+#melding{border-radius:12px;padding:14px;font-weight:600}
+#melding[hidden]{display:none}
+#melding.ok{background:rgba(62,207,106,.12);color:var(--groen)}
+#melding.fout{background:rgba(229,72,77,.12);color:var(--rood)}
+.klein{font-size:12px;color:var(--zacht);margin-top:18px}
+</style>
+</head>
+<body>
+<h1>Voeg toe aan het bord</h1>
+<p class="sub">Prelustraal Openingsfeest · XXXV<sup>e</sup> Lustrum A.S.C./A.V.S.V.<br>Stuur een opmerking of foto in. Na goedkeuring staat hij 20 seconden op het bord.</p>
+
+<form id="formulier">
+  <label>Je naam <span>(optioneel)</span><input type="text" id="naam" maxlength="40" autocomplete="given-name"></label>
+  <label>Opmerking<textarea id="tekst" maxlength="200" placeholder="Wat moet er op het bord?"></textarea></label>
+  <div class="teller" id="teller">0 / 200</div>
+  <label class="foto" id="fotovak">📷 Kies of maak een foto <span>(optioneel)</span>
+    <input type="file" id="foto" accept="image/*">
+    <img id="voorbeeld" alt="Gekozen foto" hidden>
+  </label>
+  <button type="submit" id="verstuur">Insturen</button>
+  <div id="melding" hidden></div>
+</form>
+<p class="klein">Elke inzending wordt eerst bekeken voordat hij op het bord komt. Ingestuurde foto's worden tijdelijk opgeslagen bij ntfy.sh en na een paar uur automatisch verwijderd.</p>
+
+<script>
+"use strict";
+const NTFY = "https://ntfy.sh";
+const INBOX = "lustrum-inzending-yyde755qx0b3";
+const WACHT = 45 * 1000;   // tijd tussen twee inzendingen per telefoon
+const $ = id => document.getElementById(id);
+let fotoBlob = null;
+
+$("tekst").addEventListener("input", () => $("teller").textContent = $("tekst").value.length + " / 200");
+
+function melding(tekst, soort){ const m = $("melding"); m.textContent = tekst; m.className = soort; m.hidden = false; }
+
+// Foto verkleinen tot max. 1280 px (sneller versturen, minder data)
+async function verklein(bestand){
+  const url = URL.createObjectURL(bestand);
+  try {
+    const img = await new Promise((ok, nee) => { const i = new Image(); i.onload = () => ok(i); i.onerror = nee; i.src = url; });
+    const max = 1280, f = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * f); c.height = Math.round(img.naturalHeight * f);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise(ok => c.toBlob(ok, "image/jpeg", 0.82));
+  } finally { URL.revokeObjectURL(url); }
+}
+
+$("foto").addEventListener("change", async () => {
+  const f = $("foto").files[0];
+  if (!f) return;
+  $("melding").hidden = true;
+  try {
+    fotoBlob = await verklein(f);
+    $("voorbeeld").src = URL.createObjectURL(fotoBlob); $("voorbeeld").hidden = false;
+  } catch(e) { fotoBlob = null; $("voorbeeld").hidden = true; melding("Deze foto kan niet worden gelezen. Probeer een andere.", "fout"); }
+});
+
+$("formulier").addEventListener("submit", async e => {
+  e.preventDefault();
+  const naam = $("naam").value.trim(), tekst = $("tekst").value.trim();
+  if (!tekst && !fotoBlob) return melding("Typ een opmerking of kies een foto.", "fout");
+  let laatst = 0; try { laatst = +localStorage.getItem("lustrum-laatst") || 0; } catch(x) {}
+  const over = Math.ceil((laatst + WACHT - Date.now()) / 1000);
+  if (over > 0) return melding("Even wachten: je kunt over " + over + " seconden weer iets insturen.", "fout");
+
+  $("verstuur").disabled = true; $("verstuur").textContent = "Bezig met versturen…";
+  const inhoud = JSON.stringify({ naam, tekst });
+  try {
+    let r;
+    if (fotoBlob) {
+      r = await fetch(NTFY + "/" + INBOX + "?filename=foto.jpg&message=" + encodeURIComponent(inhoud), { method: "PUT", body: fotoBlob });
+    } else {
+      r = await fetch(NTFY + "/" + INBOX, { method: "POST", body: inhoud });
+    }
+    if (!r.ok) throw new Error(r.status === 429 ? "Het is even te druk. Probeer het over een minuut opnieuw." : "Versturen lukte niet (fout " + r.status + ").");
+    try { localStorage.setItem("lustrum-laatst", String(Date.now())); } catch(x) {}
+    melding("Ingestuurd! Na goedkeuring verschijnt het 20 seconden op het bord.", "ok");
+    $("tekst").value = ""; $("teller").textContent = "0 / 200"; $("foto").value = ""; fotoBlob = null; $("voorbeeld").hidden = true;
+  } catch(err) {
+    melding(err.message && !/fetch/i.test(err.message) ? err.message : "Versturen lukte niet. Heb je internet?", "fout");
+  } finally {
+    $("verstuur").disabled = false; $("verstuur").textContent = "Insturen";
+  }
+});
+</script>
+</body>
+</html>
