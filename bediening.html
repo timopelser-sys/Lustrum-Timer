@@ -69,6 +69,9 @@ textarea{min-height:58px;resize:vertical}
 .vink{position:absolute;top:6px;left:6px;width:28px;height:28px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.55);color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;padding:0;flex:none;z-index:2}
 .gekozen .vink{background:var(--paars-licht);border-color:var(--paars-licht)}
 .tegel.weg{opacity:0;transform:scale(.9);transition:.25s}
+.uitbak{background:rgba(106,31,194,.18);border:1px solid var(--paars);border-radius:10px;padding:9px 11px;font-size:13px;margin-bottom:10px}
+.uitbak.druk{background:rgba(229,162,77,.12);border-color:var(--oranje);color:var(--oranje)}
+.uitbak[hidden]{display:none}
 #lichtbak{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
   padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
 #lichtbak[hidden]{display:none}
@@ -100,6 +103,7 @@ textarea{min-height:58px;resize:vertical}
     <button class="ja mini" id="selJa" disabled>✓ Accepteer</button>
     <button class="nee mini" id="selNee" disabled>✕ Weiger</button>
   </div>
+  <div id="uitbak" class="uitbak" hidden></div>
   <div id="inzendingen" class="raster"></div>
   <div class="leeg" id="geenInzendingen">Nog geen nieuwe inzendingen.</div>
   <button class="rand" id="meer" style="width:100%;margin-top:10px" hidden>Toon meer</button>
@@ -260,45 +264,90 @@ if (CODE) {
   const gekozen = new Set();       // geselecteerd voor accepteren/weigeren in één keer
   let zichtbaar = 40, aantalJa = 0, aantalNee = 0;
 
-  /* ---------- versturen in bundels (ntfy staat ~60 berichten snel achter elkaar toe, daarna 1 per paar seconden) ---------- */
+  /* ---------- UITBAK: accepteren en weigeren worden bewaard en gebundeld verstuurd ----------
+     ntfy staat ongeveer 60 verzoeken snel achter elkaar toe, daarna maar één per paar seconden.
+     Daarom gaat niets meer los per tik: alles komt in de uitbak (ook bewaard als de app sluit),
+     die elke paar seconden in zo min mogelijk berichten wordt verstuurd. Zegt ntfy "te druk",
+     dan wacht de uitbak en probeert hij het zelf opnieuw. Er gaat niets verloren. */
   const MAX_BERICHT = 3500;   // ntfy-berichten blijven onder 4096 bytes
   function bundel(lijst, maak){   // verdeel in berichten die onder de limiet blijven
     const uit = []; let huidig = [];
     for (const x of lijst) {
-      if (huidig.length && new Blob([maak([...huidig, x])]).size > MAX_BERICHT) { uit.push(maak(huidig)); huidig = []; }
+      if (huidig.length && new Blob([maak([...huidig, x])]).size > MAX_BERICHT) { uit.push([maak(huidig), huidig]); huidig = []; }
       huidig.push(x);
     }
-    if (huidig.length) uit.push(maak(huidig));
+    if (huidig.length) uit.push([maak(huidig), huidig]);
     return uit;
   }
-  async function accepteer(ids){
+  const OPSLAG_UITBAK = "lustrum-uitbak-" + KANAAL;
+  let uitbak = { ja: [], nee: [] };
+  try { const u = JSON.parse(localStorage.getItem(OPSLAG_UITBAK)); if (u && Array.isArray(u.ja) && Array.isArray(u.nee)) uitbak = u; } catch(e) {}
+  const bewaarUitbak = () => { try { localStorage.setItem(OPSLAG_UITBAK, JSON.stringify(uitbak)); } catch(e) {} };
+  let bezig = false, pauzeTot = 0, mislukt = 0, laatsteVerzending = 0;
+  async function post(body){
+    try {
+      const r = await fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body });
+      return { ok: r.ok, status: r.status, wacht: parseInt(r.headers.get("retry-after") || "0", 10) || 0 };
+    } catch(e) { return { ok: false, status: 0, wacht: 0 }; }
+  }
+  function toonUitbak(){
+    const n = uitbak.ja.length, m = uitbak.nee.length, u = $("uitbak");
+    if (!n && !m) { u.hidden = true; return; }
+    u.hidden = false;
+    const wat = [n ? n + " geaccepteerd" : "", m ? m + " geweigerd" : ""].filter(Boolean).join(" en ");
+    const sec = Math.ceil((pauzeTot - Date.now()) / 1000);
+    u.className = "uitbak" + (sec > 0 ? " druk" : "");
+    u.textContent = sec > 0
+      ? "⏳ " + wat + " wacht: ntfy is even druk, opnieuw over " + sec + " s. Alles blijft bewaard."
+      : "⏳ " + wat + " wordt verstuurd…";
+  }
+  async function verwerkUitbak(){
+    toonUitbak();
+    if (bezig || Date.now() < pauzeTot || Date.now() - laatsteVerzending < 2500) return;
+    if (!uitbak.ja.length && !uitbak.nee.length) return;
+    bezig = true;
+    try {
+      // eerst acceptaties (die moeten op het bord), dan weigeringen; per keer één bericht
+      let bericht, inhoud, soort;
+      if (uitbak.ja.length) {
+        const [b, items] = uitbak.ja.length === 1 ? ["TOON " + JSON.stringify(uitbak.ja[0]), [uitbak.ja[0]]] : bundel(uitbak.ja, xs => "TOONMEER " + JSON.stringify({ items: xs }))[0];
+        bericht = b; inhoud = items; soort = "ja";
+      } else {
+        const [b, ids] = bundel(uitbak.nee, xs => "BESLUIT nee " + xs.join(" "))[0];
+        bericht = b; inhoud = ids; soort = "nee";
+      }
+      laatsteVerzending = Date.now();
+      const r = await post(bericht);
+      if (r.ok) {
+        mislukt = 0;
+        if (soort === "ja") { const ids = new Set(inhoud.map(z => z.id)); uitbak.ja = uitbak.ja.filter(z => !ids.has(z.id)); aantalJa += inhoud.length; log("Verstuurd: " + inhoud.length + " geaccepteerd", "ok"); }
+        else { const ids = new Set(inhoud); uitbak.nee = uitbak.nee.filter(id => !ids.has(id)); log("Verstuurd: " + inhoud.length + " geweigerd"); }
+        bewaarUitbak(); tekenInzendingenLater();
+      } else {
+        mislukt++;
+        // te druk (429) of geen verbinding: wachten en opnieuw, steeds iets langer (max 30 s)
+        const wacht = Math.min(30, Math.max(r.wacht, r.status === 429 ? 10 : 5) * Math.min(3, mislukt));
+        pauzeTot = Date.now() + wacht * 1000;
+        if (mislukt === 1 || mislukt % 5 === 0) log(r.status === 429 ? "ntfy is even druk, de uitbak probeert het over " + wacht + " s opnieuw" : "Geen verbinding, de uitbak probeert het over " + wacht + " s opnieuw", "fout");
+      }
+    } finally { bezig = false; toonUitbak(); }
+  }
+  setInterval(verwerkUitbak, 1000);
+  function accepteer(ids){
     ids = ids.filter(id => inzendingen.has(id) && !besloten.has(id));
     if (!ids.length) return;
-    const items = ids.map(id => { const z = inzendingen.get(id); return { id, naam: z.naam, tekst: z.tekst, foto: z.foto }; });
-    ids.forEach(id => { besloten.add(id); gekozen.delete(id); });
-    tekenInzendingenLater();
-    const berichten = items.length === 1 ? ["TOON " + JSON.stringify(items[0])] : bundel(items, xs => "TOONMEER " + JSON.stringify({ items: xs }));
-    let gelukt = 0;
-    for (const m of berichten) {
-      if (!(await stuur(m, true))) break;
-      gelukt += m.startsWith("TOONMEER") ? JSON.parse(m.slice(9)).items.length : 1;
+    for (const id of ids) {
+      const z = inzendingen.get(id), item = { id, naam: z.naam, tekst: z.tekst, foto: z.foto };
+      besloten.add(id); gekozen.delete(id); geaccepteerd.set(id, item); uitbak.ja.push(item);
     }
-    items.slice(0, gelukt).forEach(z => geaccepteerd.set(z.id, z));
-    items.slice(gelukt).forEach(z => besloten.delete(z.id));   // mislukt: terug in de lijst
-    aantalJa += gelukt; bewaarBesloten(); tekenInzendingenLater();
-    log(gelukt === items.length ? "Geaccepteerd: " + gelukt + (gelukt === 1 ? " inzending" : " inzendingen") : "Maar " + gelukt + " van " + items.length + " geaccepteerd, probeer de rest opnieuw", gelukt === items.length ? "ok" : "fout");
+    bewaarBesloten(); bewaarUitbak(); tekenInzendingenLater(); toonUitbak();
+    if (Date.now() - laatsteVerzending >= 2500) setTimeout(verwerkUitbak, 400);   // eerste meteen, rest gebundeld
   }
-  // weigeren wordt kort verzameld en dan in één bericht verstuurd
-  let weigerRij = [], weigerTimer = null;
   function weiger(ids){
     ids = ids.filter(id => !besloten.has(id));
-    ids.forEach(id => { besloten.add(id); gekozen.delete(id); weigerRij.push(id); });
-    aantalNee += ids.length; bewaarBesloten(); tekenInzendingenLater();
-    clearTimeout(weigerTimer);
-    weigerTimer = setTimeout(async () => {
-      const lijst = weigerRij; weigerRij = [];
-      for (const m of bundel(lijst, xs => "BESLUIT nee " + xs.join(" "))) await stuur(m, true);
-    }, 2000);
+    if (!ids.length) return;
+    ids.forEach(id => { besloten.add(id); gekozen.delete(id); uitbak.nee.push(id); });
+    aantalNee += ids.length; bewaarBesloten(); bewaarUitbak(); tekenInzendingenLater(); toonUitbak();
   }
 
   /* ---------- te beoordelen: compact raster ---------- */
@@ -327,12 +376,15 @@ if (CODE) {
       if (box.children[i] !== t) box.insertBefore(t, box.children[i] || null);
     });
   }
+  const kijker = "IntersectionObserver" in window
+    ? new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.src = e.target.dataset.src; kijker.unobserve(e.target); } }), { rootMargin: "150px 0px" })
+    : { observe: img => { img.src = img.dataset.src; }, unobserve(){} };
   function maakTegel(id, z){
     const t = el("div", "tegel" + (z.foto ? "" : " alleenTekst")); t.dataset.id = id;
     const v = el("button", "vink", "✓"); v.setAttribute("aria-label", "Selecteren");
     v.onclick = () => { gekozen.has(id) ? gekozen.delete(id) : gekozen.add(id); tekenInzendingenLater(); };
     t.append(v);
-    if (z.foto) { const img = el("img", "beeld"); img.src = z.foto; img.alt = "Ingestuurde foto"; img.loading = "lazy"; img.onclick = () => lichtbak(id); t.append(img); }
+    if (z.foto) { const img = el("img", "beeld"); img.dataset.src = z.foto; img.alt = "Ingestuurde foto"; img.onclick = () => lichtbak(id); kijker.observe(img); t.append(img); }
     if (z.tekst) { const tk = el("div", "tk", z.tekst); tk.onclick = () => lichtbak(id); t.append(tk); }
     t.append(el("div", "wie", (z.naam || "Anoniem") + " · " + hhmm(new Date(z.tijd * 1000))));
     const k = el("div", "knoppen");
@@ -370,7 +422,7 @@ if (CODE) {
   /* ---------- nu op het bord + mededelingen ---------- */
   function regel(id, z, knopTekst, cmd, soort){
     const r = el("div", "item" + (soort ? " " + soort : ""));
-    if (z && z.foto) { const img = el("img"); img.src = z.foto; img.alt = ""; r.append(img); }
+    if (z && z.foto) { const img = el("img"); img.src = z.foto; img.alt = ""; img.loading = "lazy"; r.append(img); }
     const wat = el("div", "wat", z ? (z.tekst || (z.foto ? "(foto)" : "")) : "(inhoud onbekend)");
     if (z && z.naam) wat.append(el("small", "", z.naam));
     const b = el("button", "nee mini", knopTekst);
