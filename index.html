@@ -106,6 +106,8 @@ body.qrPauze #qr{align-items:flex-end}
   Afstandsbediening: <span id="hVerb"></span><br>
   Scherm wakker houden: <span id="hWakker"></span><br>
   Tijden: <span id="hTijden"></span><br>
+  <b>Tekst per uur (zo komt het op het scherm):</b>
+  <div id="hTeksten" style="margin:.4vh 0 1vh;font-size:1.3vw;line-height:1.5"></div>
   Kanaal: <span id="hKanaal"></span>
 </div>
 
@@ -640,6 +642,8 @@ document.addEventListener("keydown", e => {
     $("hKlok").textContent = nlTijd(nu()) + " (Nederlandse tijd)";
     $("hCorr").textContent = staat.correctie ? "(handmatige correctie " + staat.correctie / 1000 + " s)" : "";
     $("hSync").textContent = syncTekst();
+    const ht = $("hTeksten"); ht.textContent = "";
+    MOMENTEN.forEach((m, i) => { const d = document.createElement("div"); d.textContent = hhmm(m) + "  →  " + (staat.teksten[i] || "PROOST!").replace(/\n/g, "  /  "); ht.append(d); });
     $("hVerb").textContent = verbonden ? "verbonden ✓" : "niet verbonden (timer loopt gewoon door)";
     $("hWakker").textContent = wakkerStatus + (videoWakker && !videoWakker.paused ? " · video-reserve speelt ✓" : "");
     $("hulp").classList.toggle("aan");
