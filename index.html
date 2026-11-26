@@ -97,6 +97,7 @@ body.qrPauze #qr{align-items:flex-end}
 
 <div id="hulp">
   <h2>Lustrum Timer</h2>
+  <kbd>U</kbd> tekst van een uur aanpassen · <kbd>R</kbd> laatste mededeling weghalen<br>
   <kbd>F</kbd> tekst van het uur nu tonen (1 min) · <kbd>S</kbd> stoppen · <kbd>T</kbd> mededeling toevoegen · <kbd>W</kbd> alle mededelingen weg<br>
   <kbd>P</kbd> insturen pauzeren/weer openen · <kbd>Q</kbd> QR-code aan/uit · <kbd>N</kbd> alle inzendingen van het bord · <kbd>+</kbd>/<kbd>-</kbd> klok ±1 s · <kbd>0</kbd> correctie op 0 · <kbd>V</kbd> volledig scherm · <kbd>H</kbd> sluiten<br><br>
   Klok: <span id="hKlok"></span> <span id="hCorr"></span><br>
@@ -652,6 +653,18 @@ document.addEventListener("keydown", e => {
   else if (k === "+" || k === "=") voerUit("KLOK +1", true);
   else if (k === "-") voerUit("KLOK -1", true);
   else if (k === "0") voerUit("KLOK 0", true);
+  else if (k === "u") {   // tekst van een uur aanpassen op de laptop zelf (werkt zonder telefoon/internet)
+    const keuze = prompt("Tekst aanpassen voor welk tijdstip?\n1 = 21:35   2 = 22:35   3 = 23:35   4 = 00:35   5 = 01:35");
+    const n = parseInt(keuze, 10);
+    if (n >= 1 && n <= 5) {
+      const nieuw = prompt("Tekst voor " + hhmm(MOMENTEN[n - 1]) + "  (gebruik | voor een nieuwe, kleinere regel):", staat.teksten[n - 1].replace(/\n/g, " | "));
+      if (nieuw !== null && nieuw.trim()) voerUit("UUR" + n + " " + nieuw, true);
+    }
+  }
+  else if (k === "r") {   // laatste mededeling weghalen
+    const laatste = staat.beheer[staat.beheer.length - 1];
+    if (laatste) voerUit("BEHEERWEG " + laatste.id, true);
+  }
   else if (k === "q") voerUit(staat.qr ? "QR UIT" : "QR AAN", true);
   else if (k === "p") {   // pauze aan/uit vanaf de laptop zelf (werkt ook als de telefoon geen verbinding heeft)
     const aan = !staat.pauze;
