@@ -82,7 +82,7 @@ textarea{min-height:58px;resize:vertical}
 #log{font-size:13px;color:var(--zacht);max-height:200px;overflow:auto}
 #log div{padding:5px 0;border-bottom:1px solid var(--rand)}
 #log .ok{color:var(--groen-licht)}#log .fout{color:var(--rood)}
-#codeKaart[hidden],#alles[hidden]{display:none}
+#codeKaart[hidden],#alles[hidden],.kaart[hidden],button[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -101,7 +101,7 @@ textarea{min-height:58px;resize:vertical}
   <form id="tokenForm" class="rij"><input id="tokenInvoer" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tk_..." style="flex:2"><button>Opslaan</button></form>
   <div class="rij" style="margin-top:8px"><button class="rand" id="tokenLaptop">Kopieer link voor de laptop</button></div>
 </div>
-<div class="kaart" id="pauzeKaart">
+<div class="kaart" id="pauzeKaart" hidden>
   <h2>Insturen via QR-code <span class="badge" id="pauzeStatus"></span></h2>
   <textarea id="pauzeInvoer" maxlength="160">de Ab is even pissen, je kan zometeen weer je foto's en teksten insturen</textarea>
   <div class="rij" style="margin-top:8px">
@@ -110,7 +110,7 @@ textarea{min-height:58px;resize:vertical}
   </div>
   <div class="klein">Op de beamer staat dan deze tekst in plaats van de QR-code. Wie de pagina al open heeft, ziet hem ook en kan even niets insturen.</div>
 </div>
-<div class="kaart">
+<div class="kaart" hidden>
   <h2>Te beoordelen <span class="badge" id="aantal"></span></h2>
   <div class="balk">
     <button class="rand mini" id="selAlles">Selecteer alles</button>
@@ -156,8 +156,8 @@ textarea{min-height:58px;resize:vertical}
     <option value="0">Tot ik hem weghaal</option>
   </select>
   <div class="rij" style="margin-top:10px">
-    <button class="rand" id="qrAan">QR-code aan</button>
-    <button class="rand" id="qrUit">QR-code uit</button>
+    <button class="rand" id="qrAan" hidden>QR-code aan</button>
+    <button class="rand" id="qrUit" hidden>QR-code uit</button>
   </div>
 </div>
 
@@ -357,7 +357,7 @@ if (CODE) {
   }
   const OPSLAG_UITBAK = "lustrum-uitbak-" + KANAAL;
   let uitbak = { ja: [], nee: [] };
-  try { const u = JSON.parse(localStorage.getItem(OPSLAG_UITBAK)); if (u && Array.isArray(u.ja) && Array.isArray(u.nee)) uitbak = u; } catch(e) {}
+  try { const u = JSON.parse(localStorage.getItem(OPSLAG_UITBAK)); if (u && Array.isArray(u.ja) && Array.isArray(u.nee)) uitbak = { ja: u.ja, nee: [] }; } catch(e) {}
   const bewaarUitbak = () => { try { localStorage.setItem(OPSLAG_UITBAK, JSON.stringify(uitbak)); } catch(e) {} };
   let bezig = false, pauzeTot = 0, mislukt = 0, laatsteVerzending = 0;
   window.uitbakNu = () => { pauzeTot = 0; mislukt = 0; laatsteVerzending = 0; };
@@ -530,7 +530,7 @@ if (CODE) {
   /* ---------- inbox van gasten ---------- */
   let laatsteTril = 0;
   try {
-    luister(INBOX, b => {
+    if (false) luister(INBOX, b => {   // QR-systeem staat uit
       if (b.event !== "message" || !b.id || inzendingen.has(b.id)) return;
       // nieuw formaat: titel "<naam> stuurde iets in", bericht = tekst; oud formaat: JSON {naam, tekst}
       let z = {};

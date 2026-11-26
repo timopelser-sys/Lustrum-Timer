@@ -58,7 +58,7 @@ body.focus #muur, body.focus #qr{opacity:0}
   text-transform:uppercase;letter-spacing:.02em;color:#c9a3ff;text-shadow:0 0 .35em rgba(122,43,224,.95),0 0 1em rgba(122,43,224,.7),0 .1em .4em rgba(0,0,0,.9)}
 
 /* ---------- QR ---------- */
-#qr{position:fixed;right:1.5vw;bottom:2.5vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.6vh;transition:opacity .8s;z-index:6}
+#qr{display:none!important;position:fixed;right:1.5vw;bottom:2.5vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.6vh;transition:opacity .8s;z-index:6}
 #qr .bijschrift{color:var(--label);font-weight:800;font-size:.95vw;letter-spacing:.04em;text-align:center;line-height:1.1}
 #qr svg{height:13.5vh;width:13.5vh;display:block;border-radius:.5vh}
 body.zonderQR #qr{display:none}
@@ -535,6 +535,7 @@ function status(){
   return wat + " · klok " + nlTijd(t) + " · " + syncTekst() + " · scherm wakker: " + wakkerStatus;
 }
 function tekenQR(){
+  staat.qr = false;   // QR-systeem staat uit
   document.body.classList.toggle("zonderQR", !staat.qr);
   document.body.classList.toggle("qrPauze", !!staat.pauze);
   $("pauzeTekst").textContent = staat.pauze || "";
