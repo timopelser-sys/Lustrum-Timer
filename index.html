@@ -96,6 +96,7 @@ body.zonderQR #qr{display:none}
   Tijd: <span id="hSync"></span><br>
   Bord: <span id="hBord"></span><br>
   Afstandsbediening: <span id="hVerb"></span><br>
+  Scherm wakker houden: <span id="hWakker"></span><br>
   Tijden: <span id="hTijden"></span><br>
   Kanaal: <span id="hKanaal"></span>
 </div>
@@ -513,7 +514,7 @@ function bordJSON(){
 function status(){
   const t = nu(), i = MOMENTEN.findIndex(m => m.getTime() > t);
   const wat = $("bericht").classList.contains("aan") ? "tekst van het uur in beeld" : i === -1 ? "afgelopen" : "aftellen naar " + hhmm(MOMENTEN[i]);
-  return wat + " · klok " + nlTijd(t) + " · " + syncTekst();
+  return wat + " · klok " + nlTijd(t) + " · " + syncTekst() + " · scherm wakker: " + wakkerStatus;
 }
 function tekenQR(){ document.body.classList.toggle("zonderQR", !staat.qr); }
 
@@ -564,6 +565,7 @@ document.addEventListener("keydown", e => {
     $("hCorr").textContent = staat.correctie ? "(handmatige correctie " + staat.correctie / 1000 + " s)" : "";
     $("hSync").textContent = syncTekst();
     $("hVerb").textContent = verbonden ? "verbonden ✓" : "niet verbonden (timer loopt gewoon door)";
+    $("hWakker").textContent = wakkerStatus + (videoWakker && !videoWakker.paused ? " · video-reserve speelt ✓" : "");
     $("hulp").classList.toggle("aan");
     document.body.style.cursor = $("hulp").classList.contains("aan") ? "default" : "none";
     return;
@@ -579,12 +581,45 @@ document.addEventListener("keydown", e => {
   else if (k === "n") voerUit("BORDLEEG", true);
   else if (k === "v") { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch(x) {} }
 });
-async function wakker(){ try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch(e) {} }
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") wakker(); });
+/* ============ SCHERM WAKKER HOUDEN ============
+   1) Wake Lock van de browser: wordt opnieuw aangevraagd zodra Windows/Chrome hem loslaat,
+      bij terugkomen in beeld, bij wisselen van volledig scherm, en voor de zekerheid elke 20 s.
+   2) Reserve: een onzichtbaar, stil "videootje" dat speelt. Een spelende video houdt het scherm ook wakker. */
+let slot = null, wakkerStatus = "nog niet gestart";
+async function wakker(){
+  if (!("wakeLock" in navigator)) { wakkerStatus = "wake lock niet ondersteund, video-reserve actief"; return; }
+  if (slot || document.visibilityState !== "visible") return;
+  try {
+    slot = await navigator.wakeLock.request("screen");
+    wakkerStatus = "actief ✓";
+    slot.addEventListener("release", () => { slot = null; wakkerStatus = "losgelaten, wordt opnieuw aangevraagd"; setTimeout(wakker, 1000); });
+  } catch(e) { slot = null; wakkerStatus = "geweigerd door de browser (" + e.name + "), video-reserve actief"; }
+}
+document.addEventListener("visibilitychange", wakker);
+document.addEventListener("fullscreenchange", wakker);
+setInterval(wakker, 20000);
+let videoWakker = null;
+function startVideoWakker(){
+  if (videoWakker) { videoWakker.play().catch(() => {}); return; }
+  try {
+    const c = document.createElement("canvas"); c.width = 64; c.height = 36;
+    const x = c.getContext("2d"); let f = 0;
+    const teken = () => { x.fillStyle = (f++ % 2) ? "#010001" : "#000000"; x.fillRect(0, 0, 64, 36); };
+    teken(); setInterval(teken, 500);
+    const v = document.createElement("video");
+    v.muted = true; v.defaultMuted = true; v.playsInline = true; v.setAttribute("muted", ""); v.setAttribute("playsinline", "");
+    v.style.cssText = "position:fixed;left:0;bottom:0;width:64px;height:36px;opacity:.01;pointer-events:none;z-index:1";
+    v.srcObject = c.captureStream(2);
+    document.body.append(v);
+    videoWakker = v;
+    v.play().catch(() => {});
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) v.play().catch(() => {}); });
+  } catch(e) {}
+}
 $("start").addEventListener("click", () => {
   $("start").style.display = "none";
   try { document.documentElement.requestFullscreen(); } catch(e) {}
-  wakker();
+  wakker(); startVideoWakker();
 });
 
 $("hTijden").textContent = MOMENTEN.map(hhmm).join(", ");
@@ -595,6 +630,7 @@ tekenMuur();
 tick();
 setInterval(tick, 100);
 verbind();
+wakker(); startVideoWakker();
 synchroniseer();
 setInterval(synchroniseer, 10 * 60 * 1000);
 </script>
