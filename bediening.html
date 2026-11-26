@@ -225,6 +225,36 @@ function log(t, soort){
   const n = new Date(), d = el("div", soort, pad(n.getHours()) + ":" + pad(n.getMinutes()) + ":" + pad(n.getSeconds()) + "  " + t);
   $("log").prepend(d);
 }
+
+/* Robuuste live-verbinding met ntfy. De browser zelf geeft het voorgoed op als ntfy bij het
+   opnieuw verbinden "te druk" zegt; deze functie blijft het altijd proberen (5 s, 10 s, ... max 60 s)
+   en gaat verder waar hij was (since = laatste bericht), zodat er niets gemist wordt.
+   Valt de verbinding stil (geen enkel teken van leven in 2 minuten), dan wordt hij ververst. */
+function luister(topic, opBericht, opStatus){
+  let laatsteId = null, wacht = 5000, es = null, laatsteTeken = Date.now(), herstartTimer = null;
+  const status = ok => { try { opStatus && opStatus(ok); } catch(e) {} };
+  function open(){
+    clearTimeout(herstartTimer);
+    try { if (es) es.close(); } catch(e) {}
+    laatsteTeken = Date.now();
+    es = new EventSource(NTFY + "/" + encodeURIComponent(topic) + "/sse?since=" + (laatsteId || "12h"));
+    es.onopen = () => { wacht = 5000; laatsteTeken = Date.now(); status(true); };
+    es.onmessage = e => {
+      laatsteTeken = Date.now();
+      let b; try { b = JSON.parse(e.data); } catch(x) { return; }
+      if (b.event === "message" && b.id) laatsteId = b.id;
+      try { opBericht(b); } catch(x) { console.warn(x); }
+    };
+    es.onerror = () => {
+      status(false);
+      if (es.readyState === EventSource.CLOSED) { herstartTimer = setTimeout(open, wacht); wacht = Math.min(60000, wacht * 2); }
+    };
+  }
+  setInterval(() => { if (Date.now() - laatsteTeken > 120000) { status(false); open(); } }, 15000);
+  addEventListener("online", () => setTimeout(open, 1000));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && es && es.readyState === EventSource.CLOSED) open(); });
+  open();
+}
 function zetStatus(s, t){ $("punt").className = "punt " + s; $("statustekst").textContent = t; }
 async function stuur(cmd, stil){
   try {
@@ -474,9 +504,7 @@ if (CODE) {
   /* ---------- inbox van gasten ---------- */
   let laatsteTril = 0;
   try {
-    const inbox = new EventSource(NTFY + "/" + INBOX + "/sse?since=12h");
-    inbox.onmessage = e => {
-      let b; try { b = JSON.parse(e.data); } catch(x) { return; }
+    luister(INBOX, b => {
       if (b.event !== "message" || !b.id || inzendingen.has(b.id)) return;
       // nieuw formaat: titel "<naam> stuurde iets in", bericht = tekst; oud formaat: JSON {naam, tekst}
       let z = {};
@@ -494,17 +522,13 @@ if (CODE) {
       inzendingen.set(b.id, { naam, tekst, foto, tijd: b.time });
       tekenInzendingenLater();
       if (b.time * 1000 > Date.now() - 15000 && navigator.vibrate && Date.now() - laatsteTril > 5000) { laatsteTril = Date.now(); navigator.vibrate(150); }
-    };
+    });
   } catch(e) {}
 
   /* ---------- eigen kanaal: besluiten, geaccepteerde inhoud en stand van het scherm ---------- */
   const start = Date.now();
   try {
-    const bron = new EventSource(NTFY + "/" + encodeURIComponent(KANAAL) + "/sse?since=12h");
-    bron.onopen = () => zetStatus("ok", "verbonden");
-    bron.onerror = () => zetStatus("fout", "geen verbinding");
-    bron.onmessage = e => {
-      let b; try { b = JSON.parse(e.data); } catch(x) { return; }
+    luister(KANAAL, b => {
       if (b.event !== "message") return;
       const msg = String(b.message);
       if (msg.startsWith("✓")) {
@@ -533,7 +557,7 @@ if (CODE) {
       if (pz) { const uit = /^(UIT|OFF|OPEN)$/i.test(pz[1].trim()); $("pauzeStatus").textContent = uit ? "" : "gepauzeerd"; if (!uit) $("pauzeInvoer").value = pz[1].trim(); return; }
       const m = msg.match(/^UUR([1-5])\s*([\s\S]*)$/i);
       if (m) $("uur" + (m[1] - 1)).value = m[2].replace(/\s*\|\s*/g, "\n").trim() || STANDAARD[m[1] - 1];
-    };
+    }, ok => zetStatus(ok ? "ok" : "fout", ok ? "verbonden" : "geen verbinding, opnieuw verbinden…"));
   } catch(e) { zetStatus("fout", "geen verbinding"); }
 
   setInterval(() => {

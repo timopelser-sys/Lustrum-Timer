@@ -537,21 +537,49 @@ function tekenQR(){
 const geladen = Date.now(), gezien = new Set();
 let verbonden = false;
 function stuurNtfy(tekst){ if (KANAAL) fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body: tekst }).catch(() => {}); }
+
+/* Robuuste live-verbinding met ntfy. De browser zelf geeft het voorgoed op als ntfy bij het
+   opnieuw verbinden "te druk" zegt; deze functie blijft het altijd proberen (5 s, 10 s, ... max 60 s)
+   en gaat verder waar hij was (since = laatste bericht), zodat er niets gemist wordt.
+   Valt de verbinding stil (geen enkel teken van leven in 2 minuten), dan wordt hij ververst. */
+function luister(topic, opBericht, opStatus){
+  let laatsteId = null, wacht = 5000, es = null, laatsteTeken = Date.now(), herstartTimer = null;
+  const status = ok => { try { opStatus && opStatus(ok); } catch(e) {} };
+  function open(){
+    clearTimeout(herstartTimer);
+    try { if (es) es.close(); } catch(e) {}
+    laatsteTeken = Date.now();
+    es = new EventSource(NTFY + "/" + encodeURIComponent(topic) + "/sse?since=" + (laatsteId || "12h"));
+    es.onopen = () => { wacht = 5000; laatsteTeken = Date.now(); status(true); };
+    es.onmessage = e => {
+      laatsteTeken = Date.now();
+      let b; try { b = JSON.parse(e.data); } catch(x) { return; }
+      if (b.event === "message" && b.id) laatsteId = b.id;
+      try { opBericht(b); } catch(x) { console.warn(x); }
+    };
+    es.onerror = () => {
+      status(false);
+      if (es.readyState === EventSource.CLOSED) { herstartTimer = setTimeout(open, wacht); wacht = Math.min(60000, wacht * 2); }
+    };
+  }
+  setInterval(() => { if (Date.now() - laatsteTeken > 120000) { status(false); open(); } }, 15000);
+  addEventListener("online", () => setTimeout(open, 1000));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && es && es.readyState === EventSource.CLOSED) open(); });
+  open();
+}
+let eersteOpen = 0;
 function verbind(){
   if (P.has("offline") || !KANAAL) return;
-  try {
-    const bron = new EventSource(NTFY + "/" + encodeURIComponent(KANAAL) + "/sse?since=12h");
-    bron.onopen = () => verbonden = true;
-    bron.onerror = () => verbonden = false;
-    bron.onmessage = e => {
-      let b; try { b = JSON.parse(e.data); } catch(x) { return; }
-      if (b.event !== "message" || !b.id || gezien.has(b.id)) return;
-      gezien.add(b.id);
-      const live = b.time * 1000 > geladen - 5000;
-      const a = voerUit(b.message, live);
-      if (a && live) meld(a);
-    };
-  } catch(e) {}
+  const geladenOfficieel = Date.now() + sync.offset;
+  luister(KANAAL, b => {
+    if (b.event !== "message" || !b.id || gezien.has(b.id)) return;
+    gezien.add(b.id);
+    // "live" = verstuurd nadat deze pagina openging. Ook als de laptopklok afwijkt: alles wat binnenkomt
+    // als de eerste lading oude berichten binnen is (4 s na verbinden), is nieuw of gemist en wordt uitgevoerd.
+    const live = b.time * 1000 > geladenOfficieel - 5000 || (eersteOpen && Date.now() - eersteOpen > 4000);
+    const a = voerUit(b.message, live);
+    if (a && live) meld(a);
+  }, ok => { verbonden = ok; if (ok && !eersteOpen) eersteOpen = Date.now(); });
 }
 // Verandert het bord vanzelf (kaartje verloopt, volgende uit de rij), meld dat hooguit eens per 15 s aan de bediening
 // Bevestigingen naar de bediening worden gebundeld: hooguit één bericht per 8 seconden,
