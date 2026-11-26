@@ -284,7 +284,12 @@ if (CODE) {
     inbox.onmessage = e => {
       let b; try { b = JSON.parse(e.data); } catch(x) { return; }
       if (b.event !== "message" || !b.id || inzendingen.has(b.id)) return;
-      let z = {}; try { z = JSON.parse(b.message); } catch(x) { z = { tekst: String(b.message || "") }; }
+      // nieuw formaat: titel "<naam> stuurde iets in", bericht = tekst; oud formaat: JSON {naam, tekst}
+      let z = {};
+      try { z = JSON.parse(b.message); } catch(x) {
+        const naamUitTitel = String(b.title || "").match(/^(.*) stuurde iets in$/);
+        z = { naam: naamUitTitel ? naamUitTitel[1] : "", tekst: String(b.message || "") === "📷 Foto ingestuurd" ? "" : String(b.message || "") };
+      }
       if (typeof z !== "object" || !z) z = {};
       const foto = b.attachment && /^https:\/\//.test(b.attachment.url) && /^image\//.test(b.attachment.type || "image/") ? b.attachment.url : "";
       const tekst = String(z.tekst || "").slice(0, 200), naam = String(z.naam || "").slice(0, 40);

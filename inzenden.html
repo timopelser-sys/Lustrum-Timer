@@ -94,15 +94,20 @@ $("formulier").addEventListener("submit", async e => {
   if (over > 0) return melding("Even wachten: je kunt over " + over + " seconden weer iets insturen.", "fout");
 
   $("verstuur").disabled = true; $("verstuur").textContent = "Bezig met versturen…";
-  const inhoud = JSON.stringify({ naam, tekst });
+  // Leesbaar bericht, zodat de pushmelding van de organisator er netjes uitziet:
+  // titel = wie het instuurde, tekst = de opmerking, tik op de melding = bediening openen
+  const FOTO_ZONDER_TEKST = "📷 Foto ingestuurd";
+  const extra = "title=" + encodeURIComponent(naam ? naam + " stuurde iets in" : "Nieuwe inzending") +
+    "&click=" + encodeURIComponent("https://timopelser-sys.github.io/Lustrum-Timer/bediening.html") + "&tags=inzending";
+  const inhoud = tekst || FOTO_ZONDER_TEKST;
   try {
     let r;
     // Bij drukte (fout 429) tot 4 keer automatisch opnieuw proberen, met oplopende wachttijd
     for (let poging = 0; poging < 5; poging++) {
       if (fotoBlob) {
-        r = await fetch(NTFY + "/" + INBOX + "?filename=foto.jpg&message=" + encodeURIComponent(inhoud), { method: "PUT", body: fotoBlob });
+        r = await fetch(NTFY + "/" + INBOX + "?filename=foto.jpg&" + extra + "&message=" + encodeURIComponent(inhoud), { method: "PUT", body: fotoBlob });
       } else {
-        r = await fetch(NTFY + "/" + INBOX, { method: "POST", body: inhoud });
+        r = await fetch(NTFY + "/" + INBOX + "?" + extra, { method: "POST", body: inhoud });
       }
       if (r.status !== 429 || poging === 4) break;
       const na = Math.min(30, parseInt(r.headers.get("retry-after") || "0", 10) || (5 + poging * 5)) + Math.random() * 3;
