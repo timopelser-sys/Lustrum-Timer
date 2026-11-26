@@ -98,7 +98,7 @@ body.qrPauze #qr{align-items:flex-end}
 <div id="hulp">
   <h2>Lustrum Timer</h2>
   <kbd>F</kbd> tekst van het uur nu tonen (1 min) · <kbd>S</kbd> stoppen · <kbd>T</kbd> mededeling toevoegen · <kbd>W</kbd> alle mededelingen weg<br>
-  <kbd>Q</kbd> QR-code aan/uit · <kbd>N</kbd> alle inzendingen van het bord · <kbd>+</kbd>/<kbd>-</kbd> klok ±1 s · <kbd>0</kbd> correctie op 0 · <kbd>V</kbd> volledig scherm · <kbd>H</kbd> sluiten<br><br>
+  <kbd>P</kbd> insturen pauzeren/weer openen · <kbd>Q</kbd> QR-code aan/uit · <kbd>N</kbd> alle inzendingen van het bord · <kbd>+</kbd>/<kbd>-</kbd> klok ±1 s · <kbd>0</kbd> correctie op 0 · <kbd>V</kbd> volledig scherm · <kbd>H</kbd> sluiten<br><br>
   Klok: <span id="hKlok"></span> <span id="hCorr"></span><br>
   Tijd: <span id="hSync"></span><br>
   Bord: <span id="hBord"></span><br>
@@ -115,6 +115,7 @@ body.qrPauze #qr{align-items:flex-end}
 const CODE = decodeURIComponent(location.hash.slice(1)).trim().toLowerCase();
 const KANAAL = CODE ? "lustrum-" + CODE : "";
 const NTFY = "https://ntfy.sh";
+const PAUZE_TEKST = "de Ab is even pissen, je kan zometeen weer je foto's en teksten insturen";
 // Vaste momenten in Nederlandse tijd (CET = UTC+1 in november), onafhankelijk van de tijdzone van de laptop:
 // 21:35, 22:35, 23:35 (26 nov) en 00:35, 01:35 (27 nov)
 let MOMENTEN = [20, 21, 22, 23, 24].map(u => new Date(Date.UTC(2026, 10, 26, u, 35, 0)));
@@ -621,6 +622,12 @@ document.addEventListener("keydown", e => {
   else if (k === "-") voerUit("KLOK -1", true);
   else if (k === "0") voerUit("KLOK 0", true);
   else if (k === "q") voerUit(staat.qr ? "QR UIT" : "QR AAN", true);
+  else if (k === "p") {   // pauze aan/uit vanaf de laptop zelf (werkt ook als de telefoon geen verbinding heeft)
+    const aan = !staat.pauze;
+    voerUit(aan ? "PAUZE " + PAUZE_TEKST : "PAUZE UIT", true);
+    // ook de gastenpagina laten weten dat insturen even dicht is (lukt alleen als de laptop internet heeft)
+    fetch(NTFY + "/lustrum-status-yyde755qx0b3", { method: "POST", body: aan ? "PAUZE " + PAUZE_TEKST : "OPEN" }).catch(() => {});
+  }
   else if (k === "n") voerUit("BORDLEEG", true);
   else if (k === "v") { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch(x) {} }
 });
