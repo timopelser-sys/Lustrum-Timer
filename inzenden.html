@@ -28,6 +28,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .teller{font-size:12px;color:var(--zacht);text-align:right;margin-top:-10px}
 #melding{border-radius:12px;padding:14px;font-weight:600}
 #melding[hidden]{display:none}
+#pauze{background:var(--kaart);border:1px solid var(--paars);border-radius:14px;padding:22px 18px;text-align:center;font-size:18px;font-weight:700;line-height:1.35;margin-bottom:16px}
+#pauze[hidden],form[hidden]{display:none}
+.pauzeIcoon{font-size:34px;margin-bottom:8px}
 #melding.ok{background:rgba(62,207,106,.12);color:var(--groen)}
 #melding.fout{background:rgba(229,72,77,.12);color:var(--rood)}
 .klein{font-size:12px;color:var(--zacht);margin-top:18px}
@@ -37,6 +40,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 <h1>Voeg toe aan het bord</h1>
 <p class="sub">Prelustraal Openingsfeest · XXXV<sup>e</sup> Lustrum A.S.C./A.V.S.V.<br>Stuur een opmerking of foto in. Na goedkeuring verschijnt hij op het bord.</p>
 
+<div id="pauze" hidden><div class="pauzeIcoon">⏸</div><div id="pauzeTekst"></div></div>
 <form id="formulier">
   <label>Je naam <span>(optioneel)</span><input type="text" id="naam" maxlength="40" autocomplete="given-name"></label>
   <label>Opmerking<textarea id="tekst" maxlength="120" placeholder="Wat moet er op het bord?"></textarea></label>
@@ -54,6 +58,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 "use strict";
 const NTFY = "https://ntfy.sh";
 const INBOX = "lustrum-inzending-yyde755qx0b3";
+const STATUS = "lustrum-status-yyde755qx0b3";   // de organisatie kan insturen even pauzeren
 const WACHT = 45 * 1000;   // tijd tussen twee inzendingen per telefoon
 const $ = id => document.getElementById(id);
 let fotoBlob = null;
@@ -85,8 +90,22 @@ $("foto").addEventListener("change", async () => {
   } catch(e) { fotoBlob = null; $("voorbeeld").hidden = true; melding("Deze foto kan niet worden gelezen. Probeer een andere.", "fout"); }
 });
 
+// Pauze: de organisatie kan insturen even stopzetten. De pagina luistert live mee.
+let gepauzeerd = false;
+function zetPauze(bericht){
+  const m = String(bericht || "").match(/^PAUZE\s*([\s\S]*)$/);
+  gepauzeerd = !!m;
+  $("pauze").hidden = !gepauzeerd; $("formulier").hidden = gepauzeerd;
+  if (m) $("pauzeTekst").textContent = m[1].trim() || "Insturen is even gepauzeerd. Probeer het zo nog eens.";
+}
+try {
+  const st = new EventSource(NTFY + "/" + STATUS + "/sse?since=12h");
+  st.onmessage = e => { try { const b = JSON.parse(e.data); if (b.event === "message") zetPauze(b.message); } catch(x) {} };
+} catch(e) {}
+
 $("formulier").addEventListener("submit", async e => {
   e.preventDefault();
+  if (gepauzeerd) return;
   const naam = $("naam").value.trim(), tekst = $("tekst").value.trim();
   if (!tekst && !fotoBlob) return melding("Typ een opmerking of kies een foto.", "fout");
   let laatst = 0; try { laatst = +localStorage.getItem("lustrum-laatst") || 0; } catch(x) {}

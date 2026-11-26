@@ -95,6 +95,15 @@ textarea{min-height:58px;resize:vertical}
 </div>
 
 <div id="alles" hidden>
+<div class="kaart" id="pauzeKaart">
+  <h2>Insturen via QR-code <span class="badge" id="pauzeStatus"></span></h2>
+  <textarea id="pauzeInvoer" maxlength="160">de Ab is even pissen, je kan zometeen weer je foto's en teksten insturen</textarea>
+  <div class="rij" style="margin-top:8px">
+    <button class="nee" id="pauzeAan">⏸ Pauzeer</button>
+    <button class="ja" id="pauzeUit">▶ Weer openen</button>
+  </div>
+  <div class="klein">Op de beamer staat dan deze tekst in plaats van de QR-code. Wie de pagina al open heeft, ziet hem ook en kan even niets insturen.</div>
+</div>
 <div class="kaart">
   <h2>Te beoordelen <span class="badge" id="aantal"></span></h2>
   <div class="balk">
@@ -188,6 +197,7 @@ textarea{min-height:58px;resize:vertical}
 "use strict";
 const NTFY = "https://ntfy.sh";
 const INBOX = "lustrum-inzending-yyde755qx0b3";   // waar gasten naartoe sturen (zelfde als inzenden.html)
+const STATUS = "lustrum-status-yyde755qx0b3";     // open/gepauzeerd, gelezen door de gastenpagina
 // Nederlandse tijd (CET = UTC+1): 21:35, 22:35, 23:35, 00:35, 01:35
 const MOMENTEN = [20, 21, 22, 23, 24].map(u => new Date(Date.UTC(2026, 10, 26, u, 35)));
 const STANDAARD = ["PROOST!", "PROOST!", "PROOST!", "PROOST!", "PROOST!"];
@@ -245,6 +255,14 @@ if (CODE) {
   $("rijleeg").onclick = () => { if (confirm("Alle geaccepteerde inzendingen die nog in de rij wachten verwijderen?")) stuur("RIJLEEG"); };
   $("qrAan").onclick = () => stuur("QR AAN");
   $("qrUit").onclick = () => stuur("QR UIT");
+  async function zetPauze(aan){
+    const tekst = $("pauzeInvoer").value.trim() || "Insturen is even gepauzeerd";
+    const ok = await stuur(aan ? "PAUZE " + tekst : "PAUZE UIT");
+    try { await fetch(NTFY + "/" + STATUS, { method: "POST", body: aan ? "PAUZE " + tekst : "OPEN" }); } catch(e) {}
+    if (ok) { $("pauzeStatus").textContent = aan ? "gepauzeerd" : ""; log(aan ? "Insturen gepauzeerd" : "Insturen weer open", "ok"); }
+  }
+  $("pauzeAan").onclick = () => zetPauze(true);
+  $("pauzeUit").onclick = () => zetPauze(false);
   $("duur").onchange = () => stuur("DUUR " + $("duur").value);
   document.querySelectorAll("[data-klok]").forEach(b => b.onclick = () => stuur("KLOK " + b.dataset.klok));
   $("plaats").onclick = async () => {
@@ -504,6 +522,8 @@ if (CODE) {
         ids.forEach(id => besloten.add(id)); bewaarBesloten(); tekenInzendingenLater();
         return;
       }
+      const pz = msg.match(/^PAUZE\s*([\s\S]*)$/i);
+      if (pz) { const uit = /^(UIT|OFF|OPEN)$/i.test(pz[1].trim()); $("pauzeStatus").textContent = uit ? "" : "gepauzeerd"; if (!uit) $("pauzeInvoer").value = pz[1].trim(); return; }
       const m = msg.match(/^UUR([1-5])\s*([\s\S]*)$/i);
       if (m) $("uur" + (m[1] - 1)).value = m[2].replace(/\s*\|\s*/g, "\n").trim() || STANDAARD[m[1] - 1];
     };
