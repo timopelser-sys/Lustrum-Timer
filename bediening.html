@@ -280,7 +280,11 @@ if (CODE) {
   let bord = null, bordTijd = 0;   // laatste stand van het scherm
   const verwijderd = new Set();    // net op "haal weg" getikt, nog niet bevestigd
   const gekozen = new Set();       // geselecteerd voor accepteren/weigeren in één keer
-  let zichtbaar = 40, aantalJa = 0, aantalNee = 0;
+  let zichtbaar = 40, aantalJa = 0, aantalNee = 0, aantalDubbel = 0;
+  // Dubbele inzendingen eruit filteren: zelfde tekst (hoofdletters, spaties en leestekens tellen niet mee),
+  // of zelfde foto met zelfde tekst. De eerste blijft staan, de rest verschijnt niet.
+  const gezienInhoud = new Set();
+  const normaal = t => { const n = String(t || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim(); return n || String(t || "").replace(/\s+/g, ""); };
 
   /* ---------- UITBAK: accepteren en weigeren worden bewaard en gebundeld verstuurd ----------
      ntfy staat ongeveer 60 verzoeken snel achter elkaar toe, daarna maar één per paar seconden.
@@ -383,7 +387,7 @@ if (CODE) {
     $("selAlles").textContent = gekozen.size && gekozen.size >= Math.min(open.length, zichtbaar) ? "Niets selecteren" : "Selecteer alles";
     $("meer").hidden = open.length <= zichtbaar;
     $("meer").textContent = "Toon meer (" + (open.length - zichtbaar) + " verborgen)";
-    $("teller").textContent = (aantalJa || aantalNee) ? "Deze sessie: " + aantalJa + " geaccepteerd, " + aantalNee + " geweigerd" : "";
+    $("teller").textContent = [(aantalJa || aantalNee) ? "Deze sessie: " + aantalJa + " geaccepteerd, " + aantalNee + " geweigerd" : "", aantalDubbel ? aantalDubbel + " dubbele inzendingen automatisch weggefilterd" : ""].filter(Boolean).join(" · ");
     // tegels hergebruiken waar mogelijk (snel, ook met honderden inzendingen)
     const toon = open.slice(0, zichtbaar), ids = new Set(toon.map(([id]) => id));
     for (const t of [...box.children]) if (!ids.has(t.dataset.id)) t.remove();
@@ -484,6 +488,9 @@ if (CODE) {
       const foto = b.attachment && /^https:\/\//.test(b.attachment.url) && /^image\//.test(b.attachment.type || "image/") ? b.attachment.url : "";
       const tekst = String(z.tekst || "").slice(0, 200), naam = String(z.naam || "").slice(0, 40);
       if (!tekst && !foto) return;
+      const sleutel = foto ? "f:" + ((b.attachment && b.attachment.size) || foto) + ":" + normaal(tekst) : "t:" + normaal(tekst);
+      if (gezienInhoud.has(sleutel)) { aantalDubbel++; tekenInzendingenLater(); return; }   // dubbel: niet tonen
+      gezienInhoud.add(sleutel);
       inzendingen.set(b.id, { naam, tekst, foto, tijd: b.time });
       tekenInzendingenLater();
       if (b.time * 1000 > Date.now() - 15000 && navigator.vibrate && Date.now() - laatsteTril > 5000) { laatsteTril = Date.now(); navigator.vibrate(150); }
