@@ -33,26 +33,29 @@ body.focus #label{font-size:2.8vw}
 /* ---------- MUUR met kaartjes rondom ---------- */
 #muur{position:fixed;inset:0;transition:opacity .8s}
 body.focus #muur, body.focus #qr{opacity:0}
-/* buitenste laag: plek + zachtjes zweven; binnenste laag: scheef + inpoppen */
-.kaart{position:absolute;animation:zweef var(--zd,7s) ease-in-out var(--zv,0s) infinite alternate}
-.kaart .binnen{box-sizing:border-box;transform:rotate(var(--rot,0deg));animation:pop .7s cubic-bezier(.2,1.5,.45,1) both;
-  background:var(--kaart);border:1px solid var(--kaartrand);border-radius:.9vw;padding:.7vw .85vw;box-shadow:0 .8vh 2.4vh rgba(0,0,0,.6)}
+/* Geen kaders: alleen de foto of de losse tekst. Buitenste laag = plek (glijdt mee als het bord herschikt)
+   en zachtjes zweven; binnenste laag = scheefstand en inpoppen. Groottes zet het script, naar verhouding. */
+.kaart{position:absolute;transition:left 1s cubic-bezier(.4,0,.2,1),top 1s cubic-bezier(.4,0,.2,1);
+  animation:zweef var(--zd,7s) ease-in-out var(--zv,0s) infinite alternate}
+.kaart .binnen{transform:rotate(var(--rot,0deg));animation:pop .7s cubic-bezier(.2,1.5,.45,1) both;
+  transition:max-width 1s ease,width 1s ease}
 .kaart.weg{animation:none}
 .kaart.weg .binnen{animation:plop .45s ease-in both}
 @keyframes pop{0%{opacity:0;transform:rotate(var(--rot,0deg)) scale(.2)}60%{opacity:1;transform:rotate(calc(var(--rot,0deg) * -.5)) scale(1.12)}100%{transform:rotate(var(--rot,0deg)) scale(1)}}
 @keyframes plop{to{opacity:0;transform:rotate(var(--rot,0deg)) scale(.3)}}
 @keyframes zweef{from{transform:translate(0,0)}to{transform:translate(var(--zx,.3vw),var(--zy,.8vh))}}
-.kaart .t{color:#fff;font-weight:650;line-height:1.2;overflow-wrap:normal;white-space:pre-line}
-.kaart .n{color:var(--label);font-weight:800;font-size:.78vw;margin-top:.5vh;letter-spacing:.03em}
-/* foto's als kleine polaroids */
-.kaart.foto .binnen{background:#f4f0fa;border:0;padding:.55vw .55vw .7vw}
-.kaart.foto img{width:100%;height:10.5vh;object-fit:cover;display:block;border-radius:.3vw;background:#222}
-.kaart.foto .t{color:#1a0d2e;font-size:.8vw;margin-top:.6vh;font-weight:700}
-.kaart.foto .n{color:#6a1fc2;font-size:.8vw;margin-top:.3vh}
-/* mededelingen van de organisatie: gevuld paars, smal hoofdletter-lettertype, label */
-.kaart.beheer .binnen{background:linear-gradient(135deg,var(--beheer1),var(--beheer2));border:0;box-shadow:0 0 1.6vw var(--gloed)}
-.kaart.beheer .lbl{font:800 .7vw "Segoe UI",Arial,sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.75);margin-bottom:.6vh}
-.kaart.beheer .t{font-family:Bahnschrift,"Arial Narrow","Roboto Condensed","Segoe UI",sans-serif;font-stretch:condensed;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.kaart .t,.kaart .n,.kaart .lbl,.kaart img{transition:font-size 1s ease,width 1s ease,height 1s ease}
+/* tekst van gasten: los, wit, met een donkere gloed zodat hij goed leesbaar is */
+.kaart .t{color:#fff;font-weight:800;line-height:1.12;overflow-wrap:normal;white-space:pre-line;
+  text-shadow:0 .15em .5em rgba(0,0,0,.95),0 0 1.2em rgba(122,43,224,.35)}
+.kaart .n{color:var(--label);font-weight:800;margin-top:.35em;letter-spacing:.03em;text-shadow:0 .1em .4em rgba(0,0,0,.9)}
+/* foto's: alleen de foto, afgeronde hoeken en een schaduw */
+.kaart.foto img{display:block;border-radius:.7vw;object-fit:cover;background:#140c20;box-shadow:0 1vh 3.5vh rgba(0,0,0,.75),0 0 2.5vh rgba(122,43,224,.25)}
+.kaart.foto .t{margin-top:.45em;font-weight:750}
+/* mededelingen van de organisatie: geen kader, maar paarse gloeiende hoofdletters in een smal lettertype */
+.kaart.beheer .lbl{font-family:"Segoe UI",Arial,sans-serif;font-weight:800;letter-spacing:.2em;color:var(--label);margin-bottom:.35em;text-shadow:0 0 .6em rgba(0,0,0,.9)}
+.kaart.beheer .t{font-family:Bahnschrift,"Arial Narrow","Roboto Condensed","Segoe UI",sans-serif;font-stretch:condensed;font-weight:700;
+  text-transform:uppercase;letter-spacing:.02em;color:#c9a3ff;text-shadow:0 0 .35em rgba(122,43,224,.95),0 0 1em rgba(122,43,224,.7),0 .1em .4em rgba(0,0,0,.9)}
 
 /* ---------- QR ---------- */
 #qr{position:fixed;right:1.5vw;bottom:2.5vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.6vh;transition:opacity .8s;z-index:6}
@@ -73,7 +76,7 @@ body.zonderQR #qr{display:none}
 #hulp h2{color:var(--tekst);margin-bottom:1vh}
 #hulp kbd{background:#222;border-radius:.5vh;padding:.1vh .7vw;font-family:inherit;color:#fff}
 #testlabel{position:fixed;top:.5vh;left:50%;transform:translateX(-50%);color:#a33;font-weight:800;font-size:1vw;display:none;z-index:60}
-@media (prefers-reduced-motion: reduce){.kaart,.kaart .binnen,.kaart.weg .binnen{animation:none}#midden,#muur{transition:none}}
+@media (prefers-reduced-motion: reduce){.kaart,.kaart .binnen,.kaart.weg .binnen{animation:none}.kaart,.kaart *{transition:none!important}#midden,#muur{transition:none}}
 </style>
 </head>
 <body>
@@ -197,14 +200,14 @@ function tekenCijfers(tekst){
   $("cijfers").innerHTML = `<svg viewBox="-6 -2 ${breed+12} 122" preserveAspectRatio="xMidYMid meet"><g transform="skewX(-5) translate(5,0)">${delen.join("")}</g>${labels.join("")}</svg>`;
 }
 
-/* ============ VRIJE PLAATSING ROND DE TIMER ============
-   Elk kaartje krijgt een willekeurige plek die niet over de timer, de QR-code of andere kaartjes valt.
-   Uit veel willekeurige kandidaten kiezen we de plek die het verst van de andere kaartjes ligt,
-   zodat het bord gelijkmatig vol raakt. Posities worden in vw/vh bewaard. */
+/* ============ VRIJE PLAATSING, GROOTTE NAAR VERHOUDING ============
+   Hoe minder er op het bord staat, hoe groter alles wordt (factor S). Bij 20 items is S = 1 (kleinste stand).
+   Bij elke wijziging wordt het hele bord opnieuw ingedeeld: items blijven zo dicht mogelijk bij hun vorige plek
+   en glijden/groeien vloeiend mee. Niets valt over de timer, de QR-code of elkaar. */
 const vw = () => innerWidth / 100, vh = () => innerHeight / 100;
 const RAND = { x: 1.2, y: 2 };                       // vrije rand langs de schermkant (vw / vh)
 const TIMERVAK = { x: 23, y: 28.5, w: 54, h: 43 };    // gebied van de timer + label, ook bij MM:SS
-const TUSSENRUIMTE = 0.7;                             // minimale ruimte tussen kaartjes (vw)
+const S_MIN = 1, S_MAX = 2.8;
 function qrVak(){
   if (!staat.qr) return null;
   const r = $("qr").getBoundingClientRect();
@@ -214,91 +217,142 @@ function overlapt(a, b, marge){
   const mx = marge, my = marge * vw() / vh();
   return a.x < b.x + b.w + mx && b.x < a.x + a.w + mx && a.y < b.y + b.h + my && b.y < a.y + a.h + my;
 }
-function zoekPlek(w, h, eigenId){
-  const anderen = [...staat.op, ...staat.beheer].filter(k => k.pos && k.id !== eigenId).map(k => k.pos);
+function zoekPlek(w, h, geplaatst, vorige, marge){
+  if (w > 100 - 2 * RAND.x || h > 100 - 2 * RAND.y) return null;
   const vermijd = [TIMERVAK, qrVak()].filter(Boolean);
-  let beste = null, besteScore = -1;
-  for (let i = 0; i < 1500; i++) {
+  const vrij = c => !vermijd.some(v => overlapt(c, v, 0)) && !geplaatst.some(o => overlapt(c, o, marge));
+  if (vorige) {   // eerst proberen: precies op dezelfde plek blijven (zelfde middelpunt), binnen het scherm
+    const c = { x: Math.min(Math.max(RAND.x, vorige.x + vorige.w / 2 - w / 2), 100 - RAND.x - w), y: Math.min(Math.max(RAND.y, vorige.y + vorige.h / 2 - h / 2), 100 - RAND.y - h), w, h };
+    if (vrij(c)) return c;
+  }
+  let beste = null, besteScore = -Infinity;
+  for (let i = 0; i < 1200; i++) {
     const c = { x: RAND.x + Math.random() * (100 - 2 * RAND.x - w), y: RAND.y + Math.random() * (100 - 2 * RAND.y - h), w, h };
-    if (vermijd.some(v => overlapt(c, v, 0)) || anderen.some(o => overlapt(c, o, TUSSENRUIMTE))) continue;
-    // score: zo dicht mogelijk rond de timer (dan raakt het bord netjes vol), met wat toeval voor een los effect
-    const mid = { x: c.x + w / 2, y: c.y + h / 2 };
-    const naarTimer = Math.hypot((mid.x - 50) / 50, (mid.y - 50) / 50 * 0.8);
-    const score = -naarTimer + Math.random() * 0.35;
+    if (!vrij(c)) continue;
+    const mx = c.x + w / 2, my = c.y + h / 2;
+    // al op het bord: zo dicht mogelijk bij de vorige plek blijven; nieuw: zo dicht mogelijk rond de timer
+    const score = vorige
+      ? -Math.hypot((mx - (vorige.x + vorige.w / 2)) / 100, (my - (vorige.y + vorige.h / 2)) / 100)
+      : -Math.hypot((mx - 50) / 50, (my - 50) / 50 * 0.8) + Math.random() * 0.3;
     if (score > besteScore) { besteScore = score; beste = c; }
   }
   return beste;
 }
 
-/* ============ KAARTJES TEKENEN ============ */
+/* ============ ITEMS OPBOUWEN EN MATEN ============ */
 const kaartEls = new Map();   // id -> element
+function stijlVan(k){
+  return k.stijl || (k.stijl = { rot: +(Math.random() * 8 - 4).toFixed(1), zd: +(5 + Math.random() * 5).toFixed(1), zv: +(-Math.random() * 6).toFixed(1),
+    zx: +(Math.random() * .8 - .4).toFixed(2), zy: +(Math.random() * 1.6 - .8).toFixed(2) });
+}
 function bouwKaart(k, soort){
   const el = document.createElement("div");
-  el.className = "kaart " + soort;
+  el.className = "kaart " + soort + (soort === "gast" && k.foto ? " foto" : "");
   const b = document.createElement("div"); b.className = "binnen"; el.append(b);
-  const lengte = (k.tekst || "").length;
-  if (soort === "beheer") {
-    const l = document.createElement("div"); l.className = "lbl"; l.textContent = "📣 MEDEDELING";
-    const t = document.createElement("div"); t.className = "t"; t.textContent = k.tekst;
-    t.style.fontSize = (lengte <= 25 ? 1.5 : lengte <= 70 ? 1.2 : 1.0) + "vw";
-    b.style.width = "max-content"; b.style.maxWidth = (lengte <= 25 ? 10.5 : lengte <= 70 ? 12.5 : 14) + "vw"; b.style.minWidth = "min-content";
-    b.append(l, t);
-  } else if (k.foto) {
-    el.classList.add("foto");
-    b.style.width = "8.5vw";
-    const img = document.createElement("img"); img.src = k.foto; img.alt = "";
-    b.append(img);
-    if (k.tekst) { const t = document.createElement("div"); t.className = "t"; t.textContent = k.tekst; b.append(t); }
-    if (k.naam) { const n = document.createElement("div"); n.className = "n"; n.textContent = k.naam; b.append(n); }
-  } else {
-    const t = document.createElement("div"); t.className = "t"; t.textContent = k.tekst;
-    t.style.fontSize = (lengte <= 20 ? 1.45 : lengte <= 55 ? 1.15 : 0.95) + "vw";
-    b.style.width = "max-content";                       // zo breed als de tekst nodig heeft…
-    b.style.maxWidth = (lengte <= 30 ? 9.5 : lengte <= 70 ? 11.5 : 13) + "vw";   // …tot een maximum
-    b.style.minWidth = "min-content";                    // maar nooit een woord afbreken
-    b.append(t);
-    if (k.naam) { const n = document.createElement("div"); n.className = "n"; n.textContent = "— " + k.naam; b.append(n); }
+  const voeg = (tag, cls, tekst) => { const d = document.createElement(tag); d.className = cls; if (tekst != null) d.textContent = tekst; b.append(d); return d; };
+  if (soort === "beheer") { voeg("div", "lbl", "📣 MEDEDELING"); voeg("div", "t", k.tekst); }
+  else {
+    if (k.foto) { const img = voeg("img", "", null); img.src = k.foto; img.alt = ""; }
+    if (k.tekst) voeg("div", "t", k.tekst);
+    if (k.naam) voeg("div", "n", (k.foto ? "" : "— ") + k.naam);
   }
-  // willekeurige maar vaste stijl per kaartje: scheefstand en zweefbeweging
-  const r = k.stijl || (k.stijl = { rot: +(Math.random() * 10 - 5).toFixed(1), zd: +(5 + Math.random() * 5).toFixed(1), zv: +(-Math.random() * 6).toFixed(1),
-    zx: +(Math.random() * .8 - .4).toFixed(2), zy: +(Math.random() * 1.6 - .8).toFixed(2) });
+  const r = stijlVan(k);
   el.style.setProperty("--rot", r.rot + "deg"); el.style.setProperty("--zd", r.zd + "s"); el.style.setProperty("--zv", r.zv + "s");
   el.style.setProperty("--zx", r.zx + "vw"); el.style.setProperty("--zy", r.zy + "vh");
   return el;
 }
-// Plaats een kaartje: meten, vrije plek zoeken, neerzetten. Geeft false als er geen ruimte is.
-function plaats(k, soort, forceer){
-  const el = bouwKaart(k, soort);
-  if (!k.pos) {
-    el.style.visibility = "hidden"; el.style.left = "0"; el.style.top = "0";
-    $("muur").append(el);
-    // echte afmeting (zonder animatie), plus wat de scheefstand extra ruimte kost
-    const b = el.querySelector(".binnen"), bw = b.offsetWidth, bh = b.offsetHeight;
-    const hoek = Math.abs(k.stijl.rot) * Math.PI / 180;
-    const w = (bw * Math.cos(hoek) + bh * Math.sin(hoek)) / vw() + .8;
-    const h = (bw * Math.sin(hoek) + bh * Math.cos(hoek)) / vh() + 1.6;   // + zweefruimte
-    let pos = zoekPlek(w, h, k.id);
-    if (!pos && forceer) pos = { x: RAND.x + Math.random() * (100 - 2 * RAND.x - w), y: RAND.y, w, h };
-    el.remove();
-    if (!pos) return false;
-    k.pos = { x: +pos.x.toFixed(2), y: +pos.y.toFixed(2), w: +w.toFixed(2), h: +h.toFixed(2) };
-    el.style.visibility = "";
+// Alle maten van een item bij grootte S (S = 1 is de kleinste stand, bij een vol bord)
+function zetMaat(el, k, soort, S){
+  const b = el.querySelector(".binnen"), t = el.querySelector(".t"), n = el.querySelector(".n"), l = el.querySelector(".lbl"), img = el.querySelector("img");
+  const len = (k.tekst || "").length;
+  b.style.width = "max-content"; b.style.minWidth = "min-content";   // nooit midden in een woord afbreken
+  if (soort === "beheer") {
+    t.style.fontSize = (len <= 25 ? 1.55 : len <= 70 ? 1.25 : 1.05) * S + "vw";
+    l.style.fontSize = .7 * S + "vw";
+    b.style.maxWidth = (len <= 25 ? 10.5 : len <= 70 ? 12.5 : 14) * S + "vw";
+  } else if (img) {
+    const ar = k.ar || 4 / 3;                       // breedte / hoogte van de foto
+    const w = (ar >= 1 ? 9 : 9 * Math.max(.6, ar) / .9) * S;   // staande foto's iets smaller
+    img.style.width = w + "vw"; img.style.height = (w / ar) + "vw";
+    b.style.maxWidth = w + "vw"; b.style.minWidth = "0"; b.style.width = w + "vw";
+    if (t) t.style.fontSize = .85 * S + "vw";
+    if (n) n.style.fontSize = .75 * S + "vw";
+  } else {
+    t.style.fontSize = (len <= 20 ? 1.5 : len <= 55 ? 1.2 : 1.0) * S + "vw";
+    if (n) n.style.fontSize = .8 * S + "vw";
+    b.style.maxWidth = (len <= 30 ? 9.5 : len <= 70 ? 11.5 : 13) * S + "vw";
   }
-  el.style.left = k.pos.x + "vw"; el.style.top = k.pos.y + "vh";
+}
+// Meet de echte afmeting bij grootte S met een onzichtbare kopie (zonder animaties), incl. scheefstand
+const maatCache = new Map();
+function meet(k, soort, S){
+  const sleutel = k.id + "|" + S.toFixed(3) + "|" + innerWidth + "x" + innerHeight;
+  if (maatCache.has(sleutel)) return maatCache.get(sleutel);
+  const el = bouwKaart(k, soort);
+  el.style.cssText += ";visibility:hidden;left:0;top:0;animation:none;transition:none";
+  el.querySelectorAll("*").forEach(x => { x.style.animation = "none"; x.style.transition = "none"; });
+  zetMaat(el, k, soort, S);
   $("muur").append(el);
-  kaartEls.set(k.id, el);
-  return true;
+  const b = el.querySelector(".binnen"), bw = b.offsetWidth, bh = b.offsetHeight;
+  el.remove();
+  const hoek = Math.abs(stijlVan(k).rot) * Math.PI / 180;
+  const m = { w: (bw * Math.cos(hoek) + bh * Math.sin(hoek)) / vw() + .6, h: (bw * Math.sin(hoek) + bh * Math.cos(hoek)) / vh() + 1.6 };
+  maatCache.set(sleutel, m);
+  return m;
+}
+function itemLijst(op){ return [...staat.beheer.map(k => [k, "beheer"]), ...op.map(k => [k, "gast"])]; }
+
+// Bereken een indeling voor alle items: zo groot mogelijk, kleiner tot alles past (niet kleiner dan S_MIN).
+// Geeft null als het zelfs bij de kleinste stand niet past (tenzij forceer).
+function berekenIndeling(items, forceer){
+  if (!items.length) return new Map();
+  let S = Math.min(S_MAX, Math.max(S_MIN, Math.sqrt(20 / items.length) * 1.05));
+  for (;;) {
+    const pos = new Map(), geplaatst = [];
+    let ok = true;
+    for (const [k, soort] of items) {
+      const m = meet(k, soort, S);
+      const p = zoekPlek(m.w, m.h, geplaatst, k.pos, 0.6 + 0.4 * S);
+      if (!p) { ok = false; break; }
+      pos.set(k.id, Object.assign(p, { S })); geplaatst.push(p);
+    }
+    if (ok) return pos;
+    if (S <= S_MIN + 1e-6) break;
+    S = Math.max(S_MIN, S * 0.9);
+  }
+  if (!forceer) return null;
+  // noodgeval (bijv. na herladen op een kleiner scherm): plaats wat past, de rest bovenin
+  const pos = new Map(), geplaatst = [];
+  for (const [k, soort] of items) {
+    const m = meet(k, soort, S_MIN);
+    const p = zoekPlek(m.w, m.h, geplaatst, k.pos, 0.6) || { x: RAND.x + Math.random() * 60, y: RAND.y, w: m.w, h: m.h };
+    pos.set(k.id, Object.assign(p, { S: S_MIN })); geplaatst.push(p);
+  }
+  return pos;
+}
+// Zet de berekende indeling op het scherm: nieuwe items poppen erin, bestaande glijden en groeien/krimpen mee
+function pasToe(items, pos){
+  const ids = new Set(items.map(([k]) => k.id));
+  for (const [id, el] of kaartEls) {
+    if (!ids.has(id)) { kaartEls.delete(id); el.classList.add("weg"); setTimeout(() => el.remove(), 500); }
+  }
+  for (const [k, soort] of items) {
+    const p = pos.get(k.id); if (!p) continue;
+    let el = kaartEls.get(k.id);
+    if (!el) { el = bouwKaart(k, soort); $("muur").append(el); kaartEls.set(k.id, el); }
+    zetMaat(el, k, soort, p.S);
+    el.style.left = p.x + "vw"; el.style.top = p.y + "vh";
+    k.pos = { x: +p.x.toFixed(2), y: +p.y.toFixed(2), w: +p.w.toFixed(2), h: +p.h.toFixed(2) };
+  }
+  $("hBord").textContent = staat.op.length + " inzendingen op het bord, " + staat.rij.length + " in de rij, " + staat.beheer.length + " mededelingen" +
+    (items.length ? " (grootte ×" + pos.values().next().value.S.toFixed(2) + ")" : "");
 }
 function tekenMuur(){
-  const moet = new Map();
-  staat.beheer.forEach(k => moet.set(k.id, ["beheer", k]));
-  staat.op.forEach(k => moet.set(k.id, ["gast", k]));
-  for (const [id, el] of kaartEls) {
-    if (!moet.has(id)) { kaartEls.delete(id); el.classList.add("weg"); setTimeout(() => el.remove(), 500); }
-  }
-  for (const [id, [soort, k]] of moet) if (!kaartEls.has(id)) plaats(k, soort, true);
-  $("hBord").textContent = staat.op.length + " inzendingen op het bord, " + staat.rij.length + " in de rij, " + staat.beheer.length + " mededelingen";
+  const items = itemLijst(staat.op);
+  pasToe(items, berekenIndeling(items, true));
 }
+let herschikTimer = null;
+addEventListener("resize", () => { clearTimeout(herschikTimer); herschikTimer = setTimeout(() => { maatCache.clear(); tekenMuur(); }, 400); });
 
 /* ============ HOOFDLUS ============ */
 let vorigeTick = Date.now(), bordGewijzigd = false, volgendePoging = 0;
@@ -341,14 +395,19 @@ function tick(){
   const voor = staat.op.length;
   staat.op = staat.op.filter(k => !k.tot || echt < k.tot);
   if (staat.op.length !== voor) volgendePoging = 0;
+  let erbij = false;
   while (staat.op.length < MAX_OP_BORD && staat.rij.length && echt >= volgendePoging) {
     const k = staat.rij[0];
-    if (!plaats(k, "gast", false)) { volgendePoging = echt + 3000; break; }   // geen ruimte: later opnieuw proberen
+    const items = itemLijst([...staat.op, k]);
+    const pos = berekenIndeling(items, false);
+    if (!pos) { volgendePoging = echt + 3000; break; }   // past niet meer: later opnieuw proberen
     staat.rij.shift();
     k.tot = staat.duur > 0 ? echt + staat.duur * 1000 : 0;
     staat.op.push(k);
+    pasToe(items, pos); erbij = true;
   }
-  if (staat.op.length !== voor || kaartEls.size !== staat.op.length + staat.beheer.length) { bewaar(); tekenMuur(); bordGewijzigd = true; }
+  if (erbij) { bewaar(); bordGewijzigd = true; }
+  else if (staat.op.length !== voor || kaartEls.size !== staat.op.length + staat.beheer.length) { bewaar(); tekenMuur(); bordGewijzigd = true; }
 }
 
 /* ============ COMMANDO'S ============
@@ -356,17 +415,18 @@ function tick(){
    FEEST [n] · STOP · UUR1..UUR5 ... ("|" = nieuwe regel) · KLOK +n/-n/0 · QR AAN/UIT · PING
    TEKST ... (= mededeling toevoegen) · WEG (= alle mededelingen weg) */
 function laatsteIndex(){ const t = nu(); let x = 0; MOMENTEN.forEach((m, i) => { if (m.getTime() <= t) x = i; }); return x; }
+const fotoLaden = new Set();
 const schoon = (v, n) => String(v || "").replace(/\r/g, "").slice(0, n);
 function voegBeheerToe(id, tekst){
   if (!tekst || staat.beheer.some(b => b.id === id)) return false;
   const k = { id, tekst: schoon(tekst, 160) };
-  // mededelingen hebben voorrang: is het bord vol, dan maakt de oudste inzending van een gast plaats
-  while (!plaats(k, "beheer", false)) {
-    if (!staat.op.length) { if (!plaats(k, "beheer", true)) return false; break; }
-    staat.op.sort((x, y) => (x.tot || Infinity) - (y.tot || Infinity)).shift();
-    tekenMuur();
-  }
-  staat.beheer.push(k); return true;
+  staat.beheer.push(k);
+  // mededelingen hebben voorrang: past het niet, dan maakt de oudste inzending van een gast plaats
+  let pos = berekenIndeling(itemLijst(staat.op), false);
+  while (!pos && staat.op.length) { staat.op.shift(); pos = berekenIndeling(itemLijst(staat.op), false); }
+  const items = itemLijst(staat.op);
+  pasToe(items, pos || berekenIndeling(items, true));
+  return true;
 }
 function voerUit(regel, live){
   const ruw = String(regel || "").trim();
@@ -380,12 +440,22 @@ function voerUit(regel, live){
       a = "Mededeling staat op het bord";
     } else {
       if (!live) return null;
-      if ([...staat.op, ...staat.rij].some(k => k.id === id)) return null;
+      if ([...staat.op, ...staat.rij].some(k => k.id === id) || fotoLaden.has(id)) return null;
       const k = { id, naam: schoon(z.naam, 40), tekst: schoon(z.tekst, 200), foto: /^https:\/\//.test(z.foto || "") ? String(z.foto) : "" };
       if (!k.tekst && !k.foto) return null;
-      staat.rij.push(k);
-      tick();
-      a = staat.op.some(x => x.id === id) ? "Inzending staat op het bord" : "Inzending in de rij (plek " + staat.rij.length + "), bord is vol";
+      const inRij = () => { staat.rij.push(k); bewaar(); tick(); };
+      if (k.foto) {
+        // eerst de foto laden, zodat we de verhouding (staand/liggend) weten en hij meteen goed in beeld komt
+        fotoLaden.add(id);
+        const img = new Image();
+        img.onload = () => { fotoLaden.delete(id); k.ar = img.naturalWidth / img.naturalHeight || 4 / 3; inRij(); };
+        img.onerror = () => { fotoLaden.delete(id); k.foto = ""; if (k.tekst) inRij(); };
+        img.src = k.foto;
+        a = "Inzending ontvangen, komt zo op het bord";
+      } else {
+        inRij();
+        a = staat.op.some(x => x.id === id) ? "Inzending staat op het bord" : "Inzending in de rij (plek " + staat.rij.length + "), bord is vol";
+      }
     }
   } else {
     const regel2 = ruw.replace(/\r/g, "").replace(/\s*\|\s*/g, "\n").trim();
