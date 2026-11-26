@@ -95,6 +95,12 @@ textarea{min-height:58px;resize:vertical}
 </div>
 
 <div id="alles" hidden>
+<div class="kaart" id="tokenKaart">
+  <h2>ntfy-account <span class="badge" id="tokenStatus"></span></h2>
+  <div class="klein" style="margin:-4px 0 10px">Blijft ntfy "te druk" zeggen? Dan is de daglimiet van je internetadres op (gedeeld met gasten). Met een gratis ntfy-account telt alles mee voor jouw account. Plak hier je token (begint met <b>tk_</b>).</div>
+  <form id="tokenForm" class="rij"><input id="tokenInvoer" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tk_..." style="flex:2"><button>Opslaan</button></form>
+  <div class="rij" style="margin-top:8px"><button class="rand" id="tokenLaptop">Kopieer link voor de laptop</button></div>
+</div>
 <div class="kaart" id="pauzeKaart">
   <h2>Insturen via QR-code <span class="badge" id="pauzeStatus"></span></h2>
   <textarea id="pauzeInvoer" maxlength="160">de Ab is even pissen, je kan zometeen weer je foto's en teksten insturen</textarea>
@@ -208,7 +214,11 @@ const hhmm = d => NL.format(d);
 const el = (tag, cls, tekst) => { const e = document.createElement(tag); if (cls) e.className = cls; if (tekst != null) e.textContent = tekst; return e; };
 
 /* ---------- geheime code: uit de link (#code) of eerder opgeslagen ---------- */
-let CODE = decodeURIComponent(location.hash.slice(1)).trim().toLowerCase();
+const HASH = decodeURIComponent(location.hash.slice(1)).trim().split("&");
+let CODE = HASH[0].trim().toLowerCase();
+let TOKEN = "";
+try { TOKEN = (HASH.find(x => x.startsWith("tk=")) || "").slice(3).trim() || localStorage.getItem("lustrum-token") || ""; if (TOKEN) localStorage.setItem("lustrum-token", TOKEN); } catch(e) {}
+const ntfyKop = () => TOKEN ? { Authorization: "Bearer " + TOKEN } : {};
 try { if (CODE) localStorage.setItem("lustrum-code", CODE); else CODE = localStorage.getItem("lustrum-code") || ""; } catch(e) {}
 if (!CODE) { $("codeKaart").hidden = false; }
 $("codeForm").addEventListener("submit", e => {
@@ -220,6 +230,20 @@ $("codeForm").addEventListener("submit", e => {
 });
 $("andereCode").onclick = () => { try { localStorage.removeItem("lustrum-code"); } catch(x) {} location.hash = ""; location.reload(); };
 const KANAAL = CODE ? "lustrum-" + CODE : "";
+$("tokenStatus").textContent = TOKEN ? "actief" : "";
+$("tokenInvoer").value = TOKEN;
+$("tokenForm").addEventListener("submit", e => {
+  e.preventDefault();
+  TOKEN = $("tokenInvoer").value.trim();
+  try { if (TOKEN) localStorage.setItem("lustrum-token", TOKEN); else localStorage.removeItem("lustrum-token"); } catch(x) {}
+  $("tokenStatus").textContent = TOKEN ? "actief" : "";
+  if (window.uitbakNu) window.uitbakNu();   // uitbak meteen opnieuw laten proberen
+  log(TOKEN ? "ntfy-token opgeslagen, de uitbak probeert het meteen opnieuw" : "ntfy-token verwijderd", "ok");
+});
+$("tokenLaptop").onclick = async () => {
+  const link = "https://timopelser-sys.github.io/Lustrum-Timer/#" + CODE + (TOKEN ? "&tk=" + TOKEN : "");
+  try { await navigator.clipboard.writeText(link); log("Link voor de laptop gekopieerd", "ok"); } catch(e) { prompt("Kopieer deze link en open hem op de laptop:", link); }
+};
 
 function log(t, soort){
   const n = new Date(), d = el("div", soort, pad(n.getHours()) + ":" + pad(n.getMinutes()) + ":" + pad(n.getSeconds()) + "  " + t);
@@ -258,7 +282,7 @@ function luister(topic, opBericht, opStatus){
 function zetStatus(s, t){ $("punt").className = "punt " + s; $("statustekst").textContent = t; }
 async function stuur(cmd, stil){
   try {
-    const r = await fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body: cmd });
+    const r = await fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body: cmd, headers: ntfyKop() });
     if (!r.ok) throw new Error("fout " + r.status);
     if (!stil) log("Verstuurd: " + cmd.replace(/\n/g, " | ").slice(0, 80));
     return true;
@@ -288,7 +312,7 @@ if (CODE) {
   async function zetPauze(aan){
     const tekst = $("pauzeInvoer").value.trim() || "Insturen is even gepauzeerd";
     const ok = await stuur(aan ? "PAUZE " + tekst : "PAUZE UIT");
-    try { await fetch(NTFY + "/" + STATUS, { method: "POST", body: aan ? "PAUZE " + tekst : "OPEN" }); } catch(e) {}
+    try { await fetch(NTFY + "/" + STATUS, { method: "POST", body: aan ? "PAUZE " + tekst : "OPEN", headers: ntfyKop() }); } catch(e) {}
     if (ok) { $("pauzeStatus").textContent = aan ? "gepauzeerd" : ""; log(aan ? "Insturen gepauzeerd" : "Insturen weer open", "ok"); }
   }
   $("pauzeAan").onclick = () => zetPauze(true);
@@ -336,9 +360,10 @@ if (CODE) {
   try { const u = JSON.parse(localStorage.getItem(OPSLAG_UITBAK)); if (u && Array.isArray(u.ja) && Array.isArray(u.nee)) uitbak = u; } catch(e) {}
   const bewaarUitbak = () => { try { localStorage.setItem(OPSLAG_UITBAK, JSON.stringify(uitbak)); } catch(e) {} };
   let bezig = false, pauzeTot = 0, mislukt = 0, laatsteVerzending = 0;
+  window.uitbakNu = () => { pauzeTot = 0; mislukt = 0; laatsteVerzending = 0; };
   async function post(body){
     try {
-      const r = await fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body });
+      const r = await fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body, headers: ntfyKop() });
       return { ok: r.ok, status: r.status, wacht: parseInt(r.headers.get("retry-after") || "0", 10) || 0 };
     } catch(e) { return { ok: false, status: 0, wacht: 0 }; }
   }
@@ -380,7 +405,8 @@ if (CODE) {
         // te druk (429) of geen verbinding: wachten en opnieuw, steeds iets langer (max 30 s)
         const wacht = Math.min(30, Math.max(r.wacht, r.status === 429 ? 10 : 5) * Math.min(3, mislukt));
         pauzeTot = Date.now() + wacht * 1000;
-        if (mislukt === 1 || mislukt % 5 === 0) log(r.status === 429 ? "ntfy is even druk, de uitbak probeert het over " + wacht + " s opnieuw" : "Geen verbinding, de uitbak probeert het over " + wacht + " s opnieuw", "fout");
+        if (r.status === 401 || r.status === 403) log("ntfy-token wordt geweigerd: controleer het token onder 'ntfy-account'", "fout");
+        else if (mislukt === 1 || mislukt % 5 === 0) log(r.status === 429 ? "ntfy is even druk, de uitbak probeert het over " + wacht + " s opnieuw" : "Geen verbinding, de uitbak probeert het over " + wacht + " s opnieuw", "fout");
       }
     } finally { bezig = false; toonUitbak(); }
   }

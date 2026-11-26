@@ -112,7 +112,13 @@ body.qrPauze #qr{align-items:flex-end}
 "use strict";
 /* ============ INSTELLINGEN ============ */
 // Geheime code staat NIET in de code, maar achter # in de link: index.html#jouwcode
-const CODE = decodeURIComponent(location.hash.slice(1)).trim().toLowerCase();
+// Link: index.html#code  of  index.html#code&tk=TOKEN  (token van een ntfy-account, zie bediening)
+const HASH = decodeURIComponent(location.hash.slice(1)).trim().split("&");
+const CODE = HASH[0].trim().toLowerCase();
+let TOKEN = "";
+try { TOKEN = (HASH.find(x => x.startsWith("tk=")) || "").slice(3).trim() || localStorage.getItem("lustrum-token") || ""; if (TOKEN) localStorage.setItem("lustrum-token", TOKEN); } catch(e) {}
+// Met een ntfy-account telt wat we versturen mee voor dat account, niet voor het (gedeelde) internetadres
+const ntfyKop = () => TOKEN ? { Authorization: "Bearer " + TOKEN } : {};
 const KANAAL = CODE ? "lustrum-" + CODE : "";
 const NTFY = "https://ntfy.sh";
 const PAUZE_TEKST = "de Ab is even pissen, je kan zometeen weer je foto's en teksten insturen";
@@ -537,7 +543,7 @@ function tekenQR(){
 /* ============ AFSTANDSBEDIENING via ntfy.sh ============ */
 const geladen = Date.now(), gezien = new Set();
 let verbonden = false;
-function stuurNtfy(tekst){ if (KANAAL) fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body: tekst }).catch(() => {}); }
+function stuurNtfy(tekst){ if (KANAAL) fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body: tekst, headers: ntfyKop() }).catch(() => {}); }
 
 /* Robuuste live-verbinding met ntfy. De browser zelf geeft het voorgoed op als ntfy bij het
    opnieuw verbinden "te druk" zegt; deze functie blijft het altijd proberen (5 s, 10 s, ... max 60 s)
@@ -585,7 +591,7 @@ function verbind(){
 // Verandert het bord vanzelf (kaartje verloopt, volgende uit de rij), meld dat hooguit eens per 15 s aan de bediening
 // Bevestigingen naar de bediening worden gebundeld: hooguit één bericht per 8 seconden,
 // zodat de laptop nooit tegen de limiet van ntfy aanloopt, hoe druk het ook is.
-const ACK_MIN = 8000;
+const ACK_MIN = 30000;
 let ackTekst = null, ackAantal = 0, laatsteAck = 0, ackTimer = null;
 function meld(a){ ackTekst = a; ackAantal++; planAck(); }
 function planAck(){
@@ -598,7 +604,7 @@ function verstuurAck(){
   ackTekst = null; ackAantal = 0; bordGewijzigd = false;
   stuurNtfy("✓ " + tekst + "\n#BORD" + bordJSON());
 }
-setInterval(() => { if (bordGewijzigd && verbonden) planAck(); }, 15000);
+setInterval(() => { if (bordGewijzigd && verbonden) planAck(); }, 60000);
 
 /* ============ TOETSENBORD / START ============ */
 document.addEventListener("keydown", e => {
@@ -626,7 +632,7 @@ document.addEventListener("keydown", e => {
     const aan = !staat.pauze;
     voerUit(aan ? "PAUZE " + PAUZE_TEKST : "PAUZE UIT", true);
     // ook de gastenpagina laten weten dat insturen even dicht is (lukt alleen als de laptop internet heeft)
-    fetch(NTFY + "/lustrum-status-yyde755qx0b3", { method: "POST", body: aan ? "PAUZE " + PAUZE_TEKST : "OPEN" }).catch(() => {});
+    fetch(NTFY + "/lustrum-status-yyde755qx0b3", { method: "POST", body: aan ? "PAUZE " + PAUZE_TEKST : "OPEN", headers: ntfyKop() }).catch(() => {});
   }
   else if (k === "n") voerUit("BORDLEEG", true);
   else if (k === "v") { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch(x) {} }
