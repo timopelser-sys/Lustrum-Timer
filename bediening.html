@@ -52,6 +52,30 @@ textarea{min-height:58px;resize:vertical}
 .item.beheer{background:linear-gradient(90deg,rgba(106,31,194,.25),transparent);border-radius:8px;padding-left:8px;border-top:0;margin-top:6px}
 .sub{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--zacht);margin:12px 0 4px}
 .leeg{color:var(--zacht);font-size:14px}
+/* compact beoordelen: tegeltjes, twee naast elkaar */
+.balk{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.balk .klein{margin:0;flex:1;min-width:80px}
+.raster{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.tegel{position:relative;background:#000;border:1px solid var(--rand);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.tegel.gekozen{outline:3px solid var(--paars-licht);outline-offset:-1px}
+.tegel .beeld{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#111;cursor:zoom-in}
+.tegel .tk{padding:7px 9px 2px;font-size:14px;font-weight:650;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;cursor:zoom-in}
+.tegel.alleenTekst .tk{font-size:16px;-webkit-line-clamp:6;min-height:84px;padding-top:30px}
+.tegel .wie{padding:2px 9px 7px;font-size:11px;color:var(--zacht);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tegel .knoppen{display:flex;margin-top:auto;border-top:1px solid var(--rand)}
+.tegel .knoppen button{border-radius:0;padding:11px 0;font-size:18px;line-height:1}
+.tegel .knoppen .ja{background:rgba(47,169,90,.18);color:var(--groen-licht)}
+.tegel .knoppen .nee{border:0;border-left:1px solid var(--rand)}
+.vink{position:absolute;top:6px;left:6px;width:28px;height:28px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.55);color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;padding:0;flex:none;z-index:2}
+.gekozen .vink{background:var(--paars-licht);border-color:var(--paars-licht)}
+.tegel.weg{opacity:0;transform:scale(.9);transition:.25s}
+#lichtbak{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+#lichtbak[hidden]{display:none}
+#lichtbak img{max-width:100%;max-height:60vh;border-radius:10px}
+#lichtbak .tekst{font-size:20px;font-weight:700;text-align:center;overflow-wrap:anywhere;white-space:pre-line;max-width:100%}
+#lichtbak .meta{color:var(--zacht);font-size:13px}
+#lichtbak .rij{width:100%;max-width:420px}
 #log{font-size:13px;color:var(--zacht);max-height:200px;overflow:auto}
 #log div{padding:5px 0;border-bottom:1px solid var(--rand)}
 #log .ok{color:var(--groen-licht)}#log .fout{color:var(--rood)}
@@ -70,8 +94,18 @@ textarea{min-height:58px;resize:vertical}
 <div id="alles" hidden>
 <div class="kaart">
   <h2>Te beoordelen <span class="badge" id="aantal"></span></h2>
-  <div id="inzendingen"><div class="leeg">Nog geen nieuwe inzendingen.</div></div>
+  <div class="balk">
+    <button class="rand mini" id="selAlles">Selecteer alles</button>
+    <span class="klein" id="selInfo"></span>
+    <button class="ja mini" id="selJa" disabled>✓ Accepteer</button>
+    <button class="nee mini" id="selNee" disabled>✕ Weiger</button>
+  </div>
+  <div id="inzendingen" class="raster"></div>
+  <div class="leeg" id="geenInzendingen">Nog geen nieuwe inzendingen.</div>
+  <button class="rand" id="meer" style="width:100%;margin-top:10px" hidden>Toon meer</button>
+  <div class="klein" id="teller"></div>
 </div>
+<div id="lichtbak" hidden></div>
 
 <div class="kaart">
   <h2>Nu op het bord <span class="badge" id="aantalOp"></span></h2>
@@ -217,36 +251,121 @@ if (CODE) {
   /* ---------- gegevens ---------- */
   const inzendingen = new Map();   // id -> {naam, tekst, foto, tijd}  (van gasten, uit de inbox)
   const geaccepteerd = new Map();  // id -> {naam, tekst, foto}        (uit TOON-berichten)
-  const besloten = new Set();
+  const besloten = new Set();      // al beoordeeld (ook onthouden op deze telefoon)
+  const OPSLAG_BESLOTEN = "lustrum-besloten-" + KANAAL;
+  try { (JSON.parse(localStorage.getItem(OPSLAG_BESLOTEN)) || []).forEach(id => besloten.add(id)); } catch(e) {}
+  const bewaarBesloten = () => { try { localStorage.setItem(OPSLAG_BESLOTEN, JSON.stringify([...besloten].slice(-3000))); } catch(e) {} };
   let bord = null, bordTijd = 0;   // laatste stand van het scherm
   const verwijderd = new Set();    // net op "haal weg" getikt, nog niet bevestigd
+  const gekozen = new Set();       // geselecteerd voor accepteren/weigeren in één keer
+  let zichtbaar = 40, aantalJa = 0, aantalNee = 0;
 
-  /* ---------- te beoordelen ---------- */
+  /* ---------- versturen in bundels (ntfy staat ~60 berichten snel achter elkaar toe, daarna 1 per paar seconden) ---------- */
+  const MAX_BERICHT = 3500;   // ntfy-berichten blijven onder 4096 bytes
+  function bundel(lijst, maak){   // verdeel in berichten die onder de limiet blijven
+    const uit = []; let huidig = [];
+    for (const x of lijst) {
+      if (huidig.length && new Blob([maak([...huidig, x])]).size > MAX_BERICHT) { uit.push(maak(huidig)); huidig = []; }
+      huidig.push(x);
+    }
+    if (huidig.length) uit.push(maak(huidig));
+    return uit;
+  }
+  async function accepteer(ids){
+    ids = ids.filter(id => inzendingen.has(id) && !besloten.has(id));
+    if (!ids.length) return;
+    const items = ids.map(id => { const z = inzendingen.get(id); return { id, naam: z.naam, tekst: z.tekst, foto: z.foto }; });
+    ids.forEach(id => { besloten.add(id); gekozen.delete(id); });
+    tekenInzendingenLater();
+    const berichten = items.length === 1 ? ["TOON " + JSON.stringify(items[0])] : bundel(items, xs => "TOONMEER " + JSON.stringify({ items: xs }));
+    let gelukt = 0;
+    for (const m of berichten) {
+      if (!(await stuur(m, true))) break;
+      gelukt += m.startsWith("TOONMEER") ? JSON.parse(m.slice(9)).items.length : 1;
+    }
+    items.slice(0, gelukt).forEach(z => geaccepteerd.set(z.id, z));
+    items.slice(gelukt).forEach(z => besloten.delete(z.id));   // mislukt: terug in de lijst
+    aantalJa += gelukt; bewaarBesloten(); tekenInzendingenLater();
+    log(gelukt === items.length ? "Geaccepteerd: " + gelukt + (gelukt === 1 ? " inzending" : " inzendingen") : "Maar " + gelukt + " van " + items.length + " geaccepteerd, probeer de rest opnieuw", gelukt === items.length ? "ok" : "fout");
+  }
+  // weigeren wordt kort verzameld en dan in één bericht verstuurd
+  let weigerRij = [], weigerTimer = null;
+  function weiger(ids){
+    ids = ids.filter(id => !besloten.has(id));
+    ids.forEach(id => { besloten.add(id); gekozen.delete(id); weigerRij.push(id); });
+    aantalNee += ids.length; bewaarBesloten(); tekenInzendingenLater();
+    clearTimeout(weigerTimer);
+    weigerTimer = setTimeout(async () => {
+      const lijst = weigerRij; weigerRij = [];
+      for (const m of bundel(lijst, xs => "BESLUIT nee " + xs.join(" "))) await stuur(m, true);
+    }, 2000);
+  }
+
+  /* ---------- te beoordelen: compact raster ---------- */
+  let tekenGepland = false;
+  function tekenInzendingenLater(){ if (!tekenGepland) { tekenGepland = true; requestAnimationFrame(() => { tekenGepland = false; tekenInzendingen(); }); } }
+  function openLijst(){ return [...inzendingen.entries()].filter(([id]) => !besloten.has(id)).sort((a, b) => a[1].tijd - b[1].tijd); }
   function tekenInzendingen(){
-    const box = $("inzendingen"); box.textContent = "";
-    const open = [...inzendingen.entries()].filter(([id]) => !besloten.has(id)).sort((a, b) => a[1].tijd - b[1].tijd);
+    const box = $("inzendingen"), open = openLijst();
+    for (const id of [...gekozen]) if (besloten.has(id)) gekozen.delete(id);
     $("aantal").textContent = open.length || "";
     document.title = (open.length ? "(" + open.length + ") " : "") + "Lustrum Bediening";
-    if (!open.length) { box.append(el("div", "leeg", "Nog geen nieuwe inzendingen.")); return; }
-    for (const [id, z] of open) {
-      const kaart = el("div", "inz");
-      if (z.foto) { const img = el("img"); img.src = z.foto; img.alt = "Ingestuurde foto"; img.loading = "lazy"; kaart.append(img); }
-      if (z.tekst) kaart.append(el("div", "tekst", z.tekst));
-      kaart.append(el("div", "meta", (z.naam ? z.naam + " · " : "") + "ingestuurd " + hhmm(new Date(z.tijd * 1000))));
-      const rij = el("div", "rij");
-      const ja = el("button", "ja", "Accepteren"), nee = el("button", "nee", "Weigeren");
-      ja.onclick = async () => {
-        ja.disabled = nee.disabled = true;
-        const ok = await stuur("TOON " + JSON.stringify({ id, naam: z.naam, tekst: z.tekst, foto: z.foto }), true);
-        if (ok) { besloten.add(id); geaccepteerd.set(id, z); stuur("BESLUIT " + id + " ja", true); log("Geaccepteerd: " + (z.tekst || "foto").slice(0, 40), "ok"); tekenInzendingen(); }
-        else ja.disabled = nee.disabled = false;
-      };
-      nee.onclick = () => { besloten.add(id); stuur("BESLUIT " + id + " nee", true); log("Geweigerd: " + (z.tekst || "foto").slice(0, 40)); tekenInzendingen(); };
-      rij.append(ja, nee);
-      kaart.append(rij);
-      box.append(kaart);
-    }
+    $("geenInzendingen").hidden = open.length > 0;
+    $("selInfo").textContent = gekozen.size ? gekozen.size + " geselecteerd" : open.length ? open.length + " wachten" : "";
+    $("selJa").disabled = $("selNee").disabled = !gekozen.size;
+    $("selAlles").textContent = gekozen.size && gekozen.size >= Math.min(open.length, zichtbaar) ? "Niets selecteren" : "Selecteer alles";
+    $("meer").hidden = open.length <= zichtbaar;
+    $("meer").textContent = "Toon meer (" + (open.length - zichtbaar) + " verborgen)";
+    $("teller").textContent = (aantalJa || aantalNee) ? "Deze sessie: " + aantalJa + " geaccepteerd, " + aantalNee + " geweigerd" : "";
+    // tegels hergebruiken waar mogelijk (snel, ook met honderden inzendingen)
+    const toon = open.slice(0, zichtbaar), ids = new Set(toon.map(([id]) => id));
+    for (const t of [...box.children]) if (!ids.has(t.dataset.id)) t.remove();
+    toon.forEach(([id, z], i) => {
+      let t = box.querySelector('[data-id="' + CSS.escape(id) + '"]');
+      if (!t) t = maakTegel(id, z);
+      t.classList.toggle("gekozen", gekozen.has(id));
+      if (box.children[i] !== t) box.insertBefore(t, box.children[i] || null);
+    });
   }
+  function maakTegel(id, z){
+    const t = el("div", "tegel" + (z.foto ? "" : " alleenTekst")); t.dataset.id = id;
+    const v = el("button", "vink", "✓"); v.setAttribute("aria-label", "Selecteren");
+    v.onclick = () => { gekozen.has(id) ? gekozen.delete(id) : gekozen.add(id); tekenInzendingenLater(); };
+    t.append(v);
+    if (z.foto) { const img = el("img", "beeld"); img.src = z.foto; img.alt = "Ingestuurde foto"; img.loading = "lazy"; img.onclick = () => lichtbak(id); t.append(img); }
+    if (z.tekst) { const tk = el("div", "tk", z.tekst); tk.onclick = () => lichtbak(id); t.append(tk); }
+    t.append(el("div", "wie", (z.naam || "Anoniem") + " · " + hhmm(new Date(z.tijd * 1000))));
+    const k = el("div", "knoppen");
+    const ja = el("button", "ja", "✓"), nee = el("button", "nee", "✕");
+    ja.setAttribute("aria-label", "Accepteren"); nee.setAttribute("aria-label", "Weigeren");
+    ja.onclick = () => { t.classList.add("weg"); accepteer([id]); };
+    nee.onclick = () => { t.classList.add("weg"); weiger([id]); };
+    k.append(ja, nee); t.append(k);
+    return t;
+  }
+  function lichtbak(id){
+    const z = inzendingen.get(id); if (!z) return;
+    const lb = $("lichtbak"); lb.textContent = "";
+    if (z.foto) { const img = el("img"); img.src = z.foto; img.alt = "Ingestuurde foto"; lb.append(img); }
+    if (z.tekst) lb.append(el("div", "tekst", z.tekst));
+    lb.append(el("div", "meta", (z.naam || "Anoniem") + " · ingestuurd " + hhmm(new Date(z.tijd * 1000))));
+    const r = el("div", "rij");
+    const ja = el("button", "ja", "✓ Accepteren"), nee = el("button", "nee", "✕ Weigeren"), terug = el("button", "rand", "Terug");
+    ja.onclick = () => { lb.hidden = true; accepteer([id]); };
+    nee.onclick = () => { lb.hidden = true; weiger([id]); };
+    terug.onclick = () => { lb.hidden = true; };
+    r.append(ja, nee); lb.append(r, terug);
+    lb.hidden = false;
+  }
+  $("selAlles").onclick = () => {
+    const open = openLijst().slice(0, zichtbaar);
+    if (gekozen.size && gekozen.size >= open.length) gekozen.clear(); else open.forEach(([id]) => gekozen.add(id));
+    tekenInzendingenLater();
+  };
+  $("selJa").onclick = () => { const ids = [...gekozen]; if (ids.length > 5 && !confirm(ids.length + " inzendingen accepteren?")) return; accepteer(ids); };
+  $("selNee").onclick = () => { const ids = [...gekozen]; if (ids.length > 5 && !confirm(ids.length + " inzendingen weigeren?")) return; weiger(ids); };
+  $("meer").onclick = () => { zichtbaar += 40; tekenInzendingenLater(); };
+  tekenInzendingen();
 
   /* ---------- nu op het bord + mededelingen ---------- */
   function regel(id, z, knopTekst, cmd, soort){
@@ -268,8 +387,8 @@ if (CODE) {
     if (!op.length && !rij.length) box.append(el("div", "leeg", "Er staan nu geen inzendingen van gasten op het bord."));
     op.forEach(id => box.append(regel(id, geaccepteerd.get(id), "Haal weg", "WEGID")));
     if (rij.length) {
-      box.append(el("div", "sub", "In de rij (" + rij.length + ")"));
-      rij.forEach(id => box.append(regel(id, geaccepteerd.get(id), "Uit rij", "WEGID")));
+      box.append(el("div", "sub", "In de rij (" + rij.length + ")" + (rij.length > 10 ? ", de eerste 10:" : "")));
+      rij.slice(0, 10).forEach(id => box.append(regel(id, geaccepteerd.get(id), "Uit rij", "WEGID")));
     }
     const beheer = bord.beheer.filter(b => !verwijderd.has(b.id));
     if (!beheer.length) lijst.append(el("div", "leeg", "Je hebt nu geen mededelingen op het bord."));
@@ -279,6 +398,7 @@ if (CODE) {
   }
 
   /* ---------- inbox van gasten ---------- */
+  let laatsteTril = 0;
   try {
     const inbox = new EventSource(NTFY + "/" + INBOX + "/sse?since=12h");
     inbox.onmessage = e => {
@@ -295,8 +415,8 @@ if (CODE) {
       const tekst = String(z.tekst || "").slice(0, 200), naam = String(z.naam || "").slice(0, 40);
       if (!tekst && !foto) return;
       inzendingen.set(b.id, { naam, tekst, foto, tijd: b.time });
-      tekenInzendingen();
-      if (b.time * 1000 > Date.now() - 15000 && navigator.vibrate) navigator.vibrate(150);
+      tekenInzendingenLater();
+      if (b.time * 1000 > Date.now() - 15000 && navigator.vibrate && Date.now() - laatsteTril > 5000) { laatsteTril = Date.now(); navigator.vibrate(150); }
     };
   } catch(e) {}
 
@@ -316,10 +436,22 @@ if (CODE) {
         if (b.time * 1000 > start - 5000 && tekst !== "Bord bijgewerkt") { log("Scherm: " + tekst.split(" · ")[0], "ok"); $("schermstatus").textContent = "Scherm: " + tekst; }
         return;
       }
-      const toon = msg.match(/^TOON\s+(\{[\s\S]*\})$/);
-      if (toon) { try { const z = JSON.parse(toon[1]); geaccepteerd.set(String(z.id), z); if (bord) tekenBord(); } catch(x) {} return; }
-      const bes = msg.match(/^BESLUIT\s+(\S+)/);
-      if (bes) { besloten.add(bes[1]); tekenInzendingen(); return; }
+      const toon = msg.match(/^(TOON|TOONMEER)\s+(\{[\s\S]*\})$/);
+      if (toon) {
+        try {
+          const j = JSON.parse(toon[2]), lijst = toon[1] === "TOONMEER" ? (j.items || []) : [j];
+          lijst.forEach(z => { geaccepteerd.set(String(z.id), z); besloten.add(String(z.id)); });
+          bewaarBesloten(); tekenInzendingenLater(); if (bord) tekenBord();
+        } catch(x) {}
+        return;
+      }
+      const bes = msg.match(/^BESLUIT\s+([\s\S]+)$/);
+      if (bes) {   // "BESLUIT nee id1 id2 ..." of oud formaat "BESLUIT id ja"
+        const delen = bes[1].trim().split(/\s+/);
+        const ids = /^(ja|nee)$/.test(delen[0]) ? delen.slice(1) : [delen[0]];
+        ids.forEach(id => besloten.add(id)); bewaarBesloten(); tekenInzendingenLater();
+        return;
+      }
       const m = msg.match(/^UUR([1-5])\s*([\s\S]*)$/i);
       if (m) $("uur" + (m[1] - 1)).value = m[2].replace(/\s*\|\s*/g, "\n").trim() || STANDAARD[m[1] - 1];
     };

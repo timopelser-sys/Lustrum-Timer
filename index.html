@@ -396,8 +396,10 @@ function tick(){
   staat.op = staat.op.filter(k => !k.tot || echt < k.tot);
   if (staat.op.length !== voor) volgendePoging = 0;
   let erbij = false;
+  if (staat.rij.length) laadFotosVooruit();
   while (staat.op.length < MAX_OP_BORD && staat.rij.length && echt >= volgendePoging) {
     const k = staat.rij[0];
+    if (k.foto && !k.ar) break;   // foto wordt nog geladen
     const items = itemLijst([...staat.op, k]);
     const pos = berekenIndeling(items, false);
     if (!pos) { volgendePoging = echt + 3000; break; }   // past niet meer: later opnieuw proberen
@@ -416,6 +418,32 @@ function tick(){
    TEKST ... (= mededeling toevoegen) · WEG (= alle mededelingen weg) */
 function laatsteIndex(){ const t = nu(); let x = 0; MOMENTEN.forEach((m, i) => { if (m.getTime() <= t) x = i; }); return x; }
 const fotoLaden = new Set();
+// Nieuwe geaccepteerde inzending achteraan in de rij. Foto's worden pas geladen als ze bijna aan de beurt zijn.
+function nieuweInzending(z){
+  if (!z || typeof z !== "object") return false;
+  const id = schoon(z.id, 40);
+  if (!id || [...staat.op, ...staat.rij].some(k => k.id === id)) return false;
+  const k = { id, naam: schoon(z.naam, 40), tekst: schoon(z.tekst, 200), foto: /^https:\/\//.test(z.foto || "") ? String(z.foto) : "" };
+  if (!k.tekst && !k.foto) return false;
+  staat.rij.push(k); bewaar();
+  return true;
+}
+// Laad de foto's van de eerstvolgende items in de rij (om te weten of ze staand of liggend zijn)
+function laadFotosVooruit(){
+  for (const k of staat.rij.slice(0, 6)) {
+    if (!k.foto || k.ar || fotoLaden.has(k.id)) continue;
+    fotoLaden.add(k.id);
+    const img = new Image();
+    img.onload = () => { fotoLaden.delete(k.id); k.ar = img.naturalWidth / img.naturalHeight || 4 / 3; bewaar(); };
+    img.onerror = () => {   // foto niet (meer) beschikbaar: alleen de tekst tonen, of overslaan als er geen tekst is
+      fotoLaden.delete(k.id); k.foto = "";
+      if (!k.tekst) staat.rij = staat.rij.filter(x => x.id !== k.id);
+      bewaar();
+    };
+    img.src = k.foto;
+    setTimeout(() => { if (fotoLaden.has(k.id)) { img.onload = null; img.onerror(); } }, 15000);   // hangt de foto: niet blijven wachten
+  }
+}
 const schoon = (v, n) => String(v || "").replace(/\r/g, "").slice(0, n);
 function voegBeheerToe(id, tekst){
   if (!tekst || staat.beheer.some(b => b.id === id)) return false;
@@ -430,32 +458,22 @@ function voegBeheerToe(id, tekst){
 }
 function voerUit(regel, live){
   const ruw = String(regel || "").trim();
-  const m0 = ruw.match(/^(TOON|BEHEER)\s+(\{[\s\S]*\})$/i);
+  const m0 = ruw.match(/^(TOONMEER|TOON|BEHEER)\s+(\{[\s\S]*\})$/i);
   let a = null;
   if (m0) {
     let z; try { z = JSON.parse(m0[2]); } catch(e) { return null; }
     const id = schoon(z.id, 40) || String(Math.random());
-    if (m0[1].toUpperCase() === "BEHEER") {
+    if (m0[1].toUpperCase() === "TOONMEER") {   // gebundelde acceptaties: {"items":[{id,naam,tekst,foto}, ...]}
+      if (!live || !Array.isArray(z.items)) return null;
+      const n = z.items.slice(0, 50).filter(nieuweInzending).length;
+      if (!n) return null;
+      a = n + " inzendingen geaccepteerd";
+    } else if (m0[1].toUpperCase() === "BEHEER") {
       if (!voegBeheerToe(id, z.tekst)) return live ? "Mededeling niet geplaatst (al aanwezig of bord vol)" : null;
       a = "Mededeling staat op het bord";
     } else {
-      if (!live) return null;
-      if ([...staat.op, ...staat.rij].some(k => k.id === id) || fotoLaden.has(id)) return null;
-      const k = { id, naam: schoon(z.naam, 40), tekst: schoon(z.tekst, 200), foto: /^https:\/\//.test(z.foto || "") ? String(z.foto) : "" };
-      if (!k.tekst && !k.foto) return null;
-      const inRij = () => { staat.rij.push(k); bewaar(); tick(); };
-      if (k.foto) {
-        // eerst de foto laden, zodat we de verhouding (staand/liggend) weten en hij meteen goed in beeld komt
-        fotoLaden.add(id);
-        const img = new Image();
-        img.onload = () => { fotoLaden.delete(id); k.ar = img.naturalWidth / img.naturalHeight || 4 / 3; inRij(); };
-        img.onerror = () => { fotoLaden.delete(id); k.foto = ""; if (k.tekst) inRij(); };
-        img.src = k.foto;
-        a = "Inzending ontvangen, komt zo op het bord";
-      } else {
-        inRij();
-        a = staat.op.some(x => x.id === id) ? "Inzending staat op het bord" : "Inzending in de rij (plek " + staat.rij.length + "), bord is vol";
-      }
+      if (!live || !nieuweInzending(z)) return null;
+      a = staat.op.some(x => x.id === id) ? "Inzending staat op het bord" : "Inzending in de rij (plek " + staat.rij.length + ")";
     }
   } else {
     const regel2 = ruw.replace(/\r/g, "").replace(/\s*\|\s*/g, "\n").trim();
@@ -515,12 +533,27 @@ function verbind(){
       gezien.add(b.id);
       const live = b.time * 1000 > geladen - 5000;
       const a = voerUit(b.message, live);
-      if (a && live) stuurNtfy("✓ " + a);
+      if (a && live) meld(a);
     };
   } catch(e) {}
 }
 // Verandert het bord vanzelf (kaartje verloopt, volgende uit de rij), meld dat hooguit eens per 15 s aan de bediening
-setInterval(() => { if (bordGewijzigd && verbonden) { bordGewijzigd = false; stuurNtfy("✓ Bord bijgewerkt\n#BORD" + bordJSON()); } }, 15000);
+// Bevestigingen naar de bediening worden gebundeld: hooguit één bericht per 8 seconden,
+// zodat de laptop nooit tegen de limiet van ntfy aanloopt, hoe druk het ook is.
+const ACK_MIN = 8000;
+let ackTekst = null, ackAantal = 0, laatsteAck = 0, ackTimer = null;
+function meld(a){ ackTekst = a; ackAantal++; planAck(); }
+function planAck(){
+  if (ackTimer) return;
+  ackTimer = setTimeout(verstuurAck, Math.max(0, laatsteAck + ACK_MIN - Date.now()));
+}
+function verstuurAck(){
+  ackTimer = null; laatsteAck = Date.now();
+  const tekst = ackTekst ? ackTekst.split("\n#BORD")[0] + (ackAantal > 1 ? " (+" + (ackAantal - 1) + " eerdere)" : "") : "Bord bijgewerkt";
+  ackTekst = null; ackAantal = 0; bordGewijzigd = false;
+  stuurNtfy("✓ " + tekst + "\n#BORD" + bordJSON());
+}
+setInterval(() => { if (bordGewijzigd && verbonden) planAck(); }, 15000);
 
 /* ============ TOETSENBORD / START ============ */
 document.addEventListener("keydown", e => {
