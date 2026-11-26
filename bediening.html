@@ -219,6 +219,30 @@ let CODE = HASH[0].trim().toLowerCase();
 let TOKEN = "";
 try { TOKEN = (HASH.find(x => x.startsWith("tk=")) || "").slice(3).trim() || localStorage.getItem("lustrum-token") || ""; if (TOKEN) localStorage.setItem("lustrum-token", TOKEN); } catch(e) {}
 const ntfyKop = () => TOKEN ? { Authorization: "Bearer " + TOKEN } : {};
+/* Versturen naar ntfy. Met token proberen we achtereenvolgens: token in de link (?auth=, werkt overal,
+   ook op iPhone), dezelfde in andere codering, token als kop, en als laatste zonder token.
+   De manier die werkt wordt onthouden. */
+let ntfyManier = 0;
+function ntfyPogingen(){
+  if (!TOKEN) return [{ q: "", h: {} }];
+  const std = btoa("Bearer " + TOKEN).replace(/=+$/, "");
+  const url = std.replace(/\+/g, "-").replace(/\//g, "_");
+  return [{ q: "?auth=" + url, h: {} }, { q: "?auth=" + encodeURIComponent(std), h: {} }, { q: "", h: { Authorization: "Bearer " + TOKEN } }, { q: "", h: {} }];
+}
+async function publiceer(topic, body){
+  const lijst = ntfyPogingen();
+  let laatste = null;
+  for (let k = 0; k < lijst.length; k++) {
+    const i = (ntfyManier + k) % lijst.length, p = lijst[i];
+    try {
+      const r = await fetch(NTFY + "/" + encodeURIComponent(topic) + p.q, { method: "POST", body, headers: p.h });
+      if (r.ok) { ntfyManier = i; return r; }
+      laatste = r;
+      if (![400, 401, 403, 429].includes(r.status)) return r;   // andere fout: niet verder proberen
+    } catch(e) { laatste = laatste || { ok: false, status: 0, headers: { get: () => null }, fout: e.message }; }
+  }
+  return laatste || { ok: false, status: 0, headers: { get: () => null } };
+}
 try { if (CODE) localStorage.setItem("lustrum-code", CODE); else CODE = localStorage.getItem("lustrum-code") || ""; } catch(e) {}
 if (!CODE) { $("codeKaart").hidden = false; }
 $("codeForm").addEventListener("submit", e => {
@@ -282,7 +306,7 @@ function luister(topic, opBericht, opStatus){
 function zetStatus(s, t){ $("punt").className = "punt " + s; $("statustekst").textContent = t; }
 async function stuur(cmd, stil){
   try {
-    const r = await fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body: cmd, headers: ntfyKop() });
+    const r = await publiceer(KANAAL, cmd);
     if (!r.ok) throw new Error("fout " + r.status);
     if (!stil) log("Verstuurd: " + cmd.replace(/\n/g, " | ").slice(0, 80));
     return true;
@@ -312,7 +336,7 @@ if (CODE) {
   async function zetPauze(aan){
     const tekst = $("pauzeInvoer").value.trim() || "Insturen is even gepauzeerd";
     const ok = await stuur(aan ? "PAUZE " + tekst : "PAUZE UIT");
-    try { await fetch(NTFY + "/" + STATUS, { method: "POST", body: aan ? "PAUZE " + tekst : "OPEN", headers: ntfyKop() }); } catch(e) {}
+    try { await publiceer(STATUS, aan ? "PAUZE " + tekst : "OPEN"); } catch(e) {}
     if (ok) { $("pauzeStatus").textContent = aan ? "gepauzeerd" : ""; log(aan ? "Insturen gepauzeerd" : "Insturen weer open", "ok"); }
   }
   $("pauzeAan").onclick = () => zetPauze(true);
@@ -363,7 +387,7 @@ if (CODE) {
   window.uitbakNu = () => { pauzeTot = 0; mislukt = 0; laatsteVerzending = 0; };
   async function post(body){
     try {
-      const r = await fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body, headers: ntfyKop() });
+      const r = await publiceer(KANAAL, body);
       return { ok: r.ok, status: r.status, wacht: parseInt(r.headers.get("retry-after") || "0", 10) || 0 };
     } catch(e) { return { ok: false, status: 0, wacht: 0 }; }
   }

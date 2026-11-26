@@ -119,6 +119,30 @@ let TOKEN = "";
 try { TOKEN = (HASH.find(x => x.startsWith("tk=")) || "").slice(3).trim() || localStorage.getItem("lustrum-token") || ""; if (TOKEN) localStorage.setItem("lustrum-token", TOKEN); } catch(e) {}
 // Met een ntfy-account telt wat we versturen mee voor dat account, niet voor het (gedeelde) internetadres
 const ntfyKop = () => TOKEN ? { Authorization: "Bearer " + TOKEN } : {};
+/* Versturen naar ntfy. Met token proberen we achtereenvolgens: token in de link (?auth=, werkt overal,
+   ook op iPhone), dezelfde in andere codering, token als kop, en als laatste zonder token.
+   De manier die werkt wordt onthouden. */
+let ntfyManier = 0;
+function ntfyPogingen(){
+  if (!TOKEN) return [{ q: "", h: {} }];
+  const std = btoa("Bearer " + TOKEN).replace(/=+$/, "");
+  const url = std.replace(/\+/g, "-").replace(/\//g, "_");
+  return [{ q: "?auth=" + url, h: {} }, { q: "?auth=" + encodeURIComponent(std), h: {} }, { q: "", h: { Authorization: "Bearer " + TOKEN } }, { q: "", h: {} }];
+}
+async function publiceer(topic, body){
+  const lijst = ntfyPogingen();
+  let laatste = null;
+  for (let k = 0; k < lijst.length; k++) {
+    const i = (ntfyManier + k) % lijst.length, p = lijst[i];
+    try {
+      const r = await fetch(NTFY + "/" + encodeURIComponent(topic) + p.q, { method: "POST", body, headers: p.h });
+      if (r.ok) { ntfyManier = i; return r; }
+      laatste = r;
+      if (![400, 401, 403, 429].includes(r.status)) return r;   // andere fout: niet verder proberen
+    } catch(e) { laatste = laatste || { ok: false, status: 0, headers: { get: () => null }, fout: e.message }; }
+  }
+  return laatste || { ok: false, status: 0, headers: { get: () => null } };
+}
 const KANAAL = CODE ? "lustrum-" + CODE : "";
 const NTFY = "https://ntfy.sh";
 const PAUZE_TEKST = "de Ab is even pissen, je kan zometeen weer je foto's en teksten insturen";
@@ -544,7 +568,7 @@ function tekenQR(){
 /* ============ AFSTANDSBEDIENING via ntfy.sh ============ */
 const geladen = Date.now(), gezien = new Set();
 let verbonden = false;
-function stuurNtfy(tekst){ if (KANAAL) fetch(NTFY + "/" + encodeURIComponent(KANAAL), { method: "POST", body: tekst, headers: ntfyKop() }).catch(() => {}); }
+function stuurNtfy(tekst){ if (KANAAL) publiceer(KANAAL, tekst).catch(() => {}); }
 
 /* Robuuste live-verbinding met ntfy. De browser zelf geeft het voorgoed op als ntfy bij het
    opnieuw verbinden "te druk" zegt; deze functie blijft het altijd proberen (5 s, 10 s, ... max 60 s)
@@ -633,7 +657,7 @@ document.addEventListener("keydown", e => {
     const aan = !staat.pauze;
     voerUit(aan ? "PAUZE " + PAUZE_TEKST : "PAUZE UIT", true);
     // ook de gastenpagina laten weten dat insturen even dicht is (lukt alleen als de laptop internet heeft)
-    fetch(NTFY + "/lustrum-status-yyde755qx0b3", { method: "POST", body: aan ? "PAUZE " + PAUZE_TEKST : "OPEN", headers: ntfyKop() }).catch(() => {});
+    publiceer("lustrum-status-yyde755qx0b3", aan ? "PAUZE " + PAUZE_TEKST : "OPEN").catch(() => {});
   }
   else if (k === "n") voerUit("BORDLEEG", true);
   else if (k === "v") { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch(x) {} }
